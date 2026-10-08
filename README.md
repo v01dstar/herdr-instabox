@@ -14,7 +14,7 @@ own sign-in, separate from the CLI's. Linux and macOS.
 
 ```bash
 herdr plugin link .                      # from a checkout (run `go build -o bin/herdr-instabox .` first)
-herdr plugin install v01dstar/herdr/plugins/instabox --ref instabox-plugin   # needs Go to build
+herdr plugin install v01dstar/herdr-instabox   # needs Go to build
 ```
 
 Open it with the `instabox settings` action, or bind keys in herdr's config. Pick

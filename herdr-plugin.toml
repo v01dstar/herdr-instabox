@@ -8,6 +8,11 @@ platforms = ["linux", "macos"]
 [[build]]
 command = ["go", "build", "-o", "bin/herdr-instabox", "."]
 
+# herdr has no manifest field for keys, so bind the defaults in config.toml.
+# Keys or actions the user has already bound are left alone.
+[[build]]
+command = ["bin/herdr-instabox", "install-keys"]
+
 # Reconcile herdr's saved machines with instabox when herdr starts...
 [[startup]]
 command = ["bin/herdr-instabox", "sync"]

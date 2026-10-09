@@ -593,3 +593,31 @@ func TestBrowserLogin(t *testing.T) {
 		t.Fatalf("the browser opens the server's sign-in page, got %q", opened)
 	}
 }
+
+func TestInstallKeysAddsOnceAndKeepsUserKeys(t *testing.T) {
+	newFake(t)
+	path := filepath.Join(t.TempDir(), "config.toml")
+	t.Setenv("HERDR_CONFIG_PATH", path)
+	original := "onboarding = false\n\n[[keys.command]]\nkey = 'prefix+shift+m'\ntype = \"plugin_action\"\ncommand = \"other.plugin.go\"\n"
+	_ = os.WriteFile(path, []byte(original), 0o600)
+	if err := installKeys(); err != nil {
+		t.Fatal(err)
+	}
+	got, _ := os.ReadFile(path)
+	if !strings.HasPrefix(string(got), original) {
+		t.Fatalf("the user's config is kept, got %q", got)
+	}
+	added := string(got)[len(original):]
+	if !strings.Contains(added, `command = "v01dstar.instabox.open"`) || strings.Contains(added, "new-workspace") {
+		t.Fatalf("binds only the free key, added %q", added)
+	}
+	if info, _ := os.Stat(path); info.Mode().Perm() != 0o600 {
+		t.Fatalf("mode kept, got %v", info.Mode().Perm())
+	}
+	if err := installKeys(); err != nil {
+		t.Fatal(err)
+	}
+	if again, _ := os.ReadFile(path); string(again) != string(got) {
+		t.Fatalf("a second run changes nothing, got %q", again)
+	}
+}

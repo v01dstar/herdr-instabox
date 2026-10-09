@@ -8,6 +8,7 @@
 //	herdr-instabox job ID                 run a background job (internal)
 //	herdr-instabox login [github|google] sign in (run in the pane's terminal)
 //	herdr-instabox ensure-cert ID DIR     renew a certificate (ssh Match exec)
+//	herdr-instabox install-keys          add default key bindings to herdr's config
 package main
 
 import (
@@ -50,6 +51,8 @@ func main() {
 		runEnsureCert(arg(2), arg(3))
 	case "login":
 		err = login(arg(2))
+	case "install-keys":
+		err = installKeys()
 	default:
 		err = fmt.Errorf("unknown command %q", cmd)
 	}

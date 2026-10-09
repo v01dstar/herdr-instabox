@@ -17,9 +17,14 @@ herdr plugin link .                      # from a checkout (run `go build -o bin
 herdr plugin install v01dstar/herdr-instabox   # needs Go to build
 ```
 
-Open it with the `instabox settings` action, or bind keys in herdr's config. Pick
-keys herdr does not already use: a custom binding that conflicts with a built-in
-one is disabled.
+Open it with the `instabox settings` action, or with the keys that installing
+adds to herdr's `config.toml`: `prefix+m` for instabox settings and
+`prefix+shift+m` for a new workspace on the default machine. A key or action
+you have already bound is left alone, and removing the bindings is up to you.
+`herdr plugin link` runs no build, so after linking run
+`bin/herdr-instabox install-keys` yourself. To bind other keys, edit the config;
+pick keys herdr does not already use, because a custom binding that conflicts
+with a built-in one is disabled.
 
 ```toml
 [[keys.command]]

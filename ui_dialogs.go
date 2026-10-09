@@ -143,13 +143,14 @@ func (m model) openAdd(snapshotID string) (tea.Model, tea.Cmd) {
 	f.addText("Name", "", "my-machine")
 	options, values, sel := []string{"Latest herdr template"}, []string{""}, 0
 	for _, im := range m.snapshots {
-		from := "a deleted machine"
+		label := im.Name + " · " + im.CreatedAt.Local().Format("2006-01-02")
+		// Name the source machine only while it exists; a deleted one says nothing useful.
 		for _, mc := range m.machines {
 			if mc.ID == im.SourceMachineID {
-				from = m.st.label(mc)
+				label += " · from " + m.st.label(mc)
 			}
 		}
-		options = append(options, fmt.Sprintf("%s · %s · from %s", im.Name, im.CreatedAt.Local().Format("2006-01-02"), from))
+		options = append(options, label)
 		values = append(values, im.ID)
 		if im.ID == snapshotID {
 			sel = len(values) - 1

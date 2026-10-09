@@ -47,7 +47,8 @@ description = "new workspace on the default machine"
   herdr-only name), Use as default, Hide from / Show in sidebar, Copy machine…
   (clone now, or save as snapshot), Delete machine…. `+ Add remote` creates a
   machine from the herdr template or one of your snapshots, or adds an SSH remote.
-- **snapshots**: your snapshots; New machine from snapshot…, Delete snapshot….
+- **snapshots**: your snapshots of herdr machines (snapshots of machines on other
+  instabox templates are not listed); New machine from snapshot…, Delete snapshot….
 - **account**: Sign in with GitHub or Google (browser, or a GitHub device code
   without one), Switch account…, Sign out…, and storage/machine/snapshot usage.
 - **New workspace** opens a workspace on the default machine (Local unless you

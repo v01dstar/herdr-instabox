@@ -320,9 +320,13 @@ func TestCreateCloneAndSnapshots(t *testing.T) {
 	}
 
 	runTestJob(t, Job{Kind: jobSaveSnapshot, MachineID: id, MachineName: "fresh", Name: "base"})
+	h = f.instabox()
+	h.Snapshots = append(h.Snapshots, map[string]any{"id": "sn_other", "name": "universal",
+		"template": map[string]any{"id": "dev", "version": "1"}, "createdAt": "2026-10-06T01:00:00Z"})
+	f.writeInstabox(h)
 	snapshots, err := listSnapshots()
 	if err != nil || len(snapshots) != 1 || snapshots[0].Name != "base" {
-		t.Fatalf("snapshot saved: %+v %v", snapshots, err)
+		t.Fatalf("only the herdr machine's snapshot is listed: %+v %v", snapshots, err)
 	}
 	runTestJob(t, Job{Kind: jobCreate, Name: "from-base", Snapshot: snapshots[0].ID, SnapshotName: "base", MachineName: "from-base"})
 	runTestJob(t, Job{Kind: jobDeleteSnapshot, Snapshot: snapshots[0].ID, SnapshotName: "base"})

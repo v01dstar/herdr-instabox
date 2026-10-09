@@ -153,7 +153,12 @@ func templateFor(templates []Template, ref *TemplateRef) (Template, bool) {
 	return Template{}, false
 }
 
-// listSnapshots returns the account's snapshots (always private), newest first.
+// HerdrTemplate is the template the plugin creates machines from.
+const HerdrTemplate = "herdr"
+
+// listSnapshots returns the account's snapshots of herdr machines, newest
+// first. Snapshots of machines on other templates are not the plugin's to
+// offer: a machine made from one would not be a herdr machine.
 func listSnapshots() ([]Snapshot, error) {
 	var out struct {
 		Snapshots []Snapshot `json:"snapshots"`
@@ -161,7 +166,12 @@ func listSnapshots() ([]Snapshot, error) {
 	if err := call(request{method: http.MethodGet, path: "/v1/snapshots", out: &out, auth: true}); err != nil {
 		return nil, err
 	}
-	snapshots := out.Snapshots
+	var snapshots []Snapshot
+	for _, sn := range out.Snapshots {
+		if sn.Template != nil && sn.Template.ID == HerdrTemplate {
+			snapshots = append(snapshots, sn)
+		}
+	}
 	sort.SliceStable(snapshots, func(i, j int) bool {
 		if !snapshots[i].CreatedAt.Equal(snapshots[j].CreatedAt) {
 			return snapshots[i].CreatedAt.After(snapshots[j].CreatedAt)

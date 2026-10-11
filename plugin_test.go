@@ -189,6 +189,25 @@ func TestSyncHiddenRenamedAndDeleted(t *testing.T) {
 	}
 }
 
+// Machines on other templates have no herdr session: they stay out of the
+// sidebar, and one already there leaves it.
+func TestSyncSkipsOtherTemplates(t *testing.T) {
+	orca := fakeMachine("m_o", "orca-box", "running")
+	orca["template"] = map[string]any{"id": "orca", "version": "1"}
+	f := newFake(t, fakeMachine("m_a", "alpha", "running"), orca)
+	f.sync()
+	if _, ok := f.profile("m_a"); !ok {
+		t.Fatal("the herdr machine is added")
+	}
+	if _, ok := f.profile("m_o"); ok || hasHostBlock("m_o") {
+		t.Fatal("the orca machine is not added")
+	}
+	ms, err := listMachines()
+	if err != nil || len(ms) != 1 || ms[0].ID != "m_a" {
+		t.Fatalf("listMachines = %+v, %v", ms, err)
+	}
+}
+
 func TestSignOutRemovesLocalTracesOnly(t *testing.T) {
 	f := newFake(t, fakeMachine("m_a", "alpha", "running"))
 	userConfig := "Host work\n  HostName work.example\n"

@@ -247,7 +247,24 @@ func waitOperation(op Operation) (Operation, error) {
 	return op, nil
 }
 
+// listMachines returns the account's herdr machines. Machines on other
+// templates (orca, universal, ...) have no herdr session, so the plugin leaves
+// them to the dashboard and the instabox CLI.
 func listMachines() ([]Machine, error) {
+	all, err := listAllMachines()
+	if err != nil {
+		return nil, err
+	}
+	var machines []Machine
+	for _, m := range all {
+		if m.Template != nil && m.Template.ID == HerdrTemplate {
+			machines = append(machines, m)
+		}
+	}
+	return machines, nil
+}
+
+func listAllMachines() ([]Machine, error) {
 	var all []Machine
 	cursor := ""
 	for range 1000 {

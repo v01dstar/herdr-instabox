@@ -644,3 +644,46 @@ func TestInstallKeysAddsOnceAndKeepsUserKeys(t *testing.T) {
 		t.Fatalf("a second run changes nothing, got %q", again)
 	}
 }
+
+func TestSignInOnARetiredServerMoves(t *testing.T) {
+	f := newFake(t, fakeMachine("m_a", "alpha", "running"))
+	f.sync()
+	c, _ := loadCredentials()
+	c.Server = "https://api.box.instacloud.com"
+	if err := saveCredentials(c); err != nil {
+		t.Fatal(err)
+	}
+	if got, _ := loadCredentials(); got.Server != defaultServerURL || got.RefreshToken != "rt" {
+		t.Fatalf("moved to %q keeping the sign-in, got %+v", defaultServerURL, got)
+	}
+	if hasHostBlock("m_a") {
+		t.Fatal("the old gateway's Host block is dropped")
+	}
+	if saved, _ := os.ReadFile(credentialsPath()); !strings.Contains(string(saved), defaultServerURL) {
+		t.Fatalf("the move is saved: %s", saved)
+	}
+	f.sync() // INSTABOX_SERVER still points at the fake API
+	if !hasHostBlock("m_a") {
+		t.Fatal("the next sync writes the Host block again")
+	}
+}
+
+func TestHostBlockFollowsANewGateway(t *testing.T) {
+	f := newFake(t, fakeMachine("m_a", "alpha", "running"))
+	f.sync()
+	old := strings.Replace(mustRead(t, hostFile("m_a")), "HostName ssh.instabox.test", "HostName gone.example", 1)
+	_ = os.WriteFile(hostFile("m_a"), []byte(old), 0o600)
+	f.sync()
+	if block := mustRead(t, hostFile("m_a")); !strings.Contains(block, "HostName ssh.instabox.test") {
+		t.Fatalf("a block naming another gateway is rewritten:\n%s", block)
+	}
+}
+
+func mustRead(t *testing.T, path string) string {
+	t.Helper()
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return string(data)
+}

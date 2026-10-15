@@ -19,7 +19,13 @@ import (
 // The plugin talks to the instabox API directly; it needs no instabox CLI.
 // Only the calls the plugin uses are here.
 
-const defaultServerURL = "https://api.box.instacloud.com"
+const defaultServerURL = "https://api.instabox.sh"
+
+// movedServers maps API servers instabox has retired to their replacement, so
+// a sign-in saved against an old one keeps working.
+var movedServers = map[string]string{
+	"https://api.box.instacloud.com": defaultServerURL,
+}
 
 // apiError is a non-2xx response.
 type apiError struct {

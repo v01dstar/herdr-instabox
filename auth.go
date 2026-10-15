@@ -47,7 +47,40 @@ func loadCredentials() (*Credentials, error) {
 	if err := json.Unmarshal(data, &c); err != nil {
 		return nil, fmt.Errorf("%s: %w", credentialsPath(), err)
 	}
+	if moved, ok := movedServers[c.Server]; ok {
+		if err := moveServer(moved); err != nil {
+			return nil, err
+		}
+		c.Server = moved
+	}
 	return &c, nil
+}
+
+// moveServer points a sign-in saved against a retired server at its
+// replacement. The SSH Host blocks and certificates name the old server's
+// gateway, so they are dropped and the next sync writes them afresh.
+func moveServer(server string) error {
+	return withLock("server.lock", func() error {
+		data, err := os.ReadFile(credentialsPath())
+		if err != nil {
+			return err
+		}
+		var c Credentials
+		if err := json.Unmarshal(data, &c); err != nil {
+			return err
+		}
+		if _, ok := movedServers[c.Server]; !ok {
+			return nil // another process moved it
+		}
+		for _, pattern := range []string{"*.conf", "*-cert.json", "*-cert.pub"} {
+			files, _ := filepath.Glob(filepath.Join(hostsDir(), pattern))
+			for _, f := range files {
+				_ = os.Remove(f)
+			}
+		}
+		c.Server = server
+		return saveCredentials(&c)
+	})
 }
 
 func saveCredentials(c *Credentials) error {

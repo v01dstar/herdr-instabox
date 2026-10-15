@@ -5,7 +5,7 @@ copy and delete machines from a settings pane modelled on herdr's own
 Settings → remotes / snapshots / account; running machines appear in herdr's
 sidebar on their own, like any saved SSH machine. herdr itself is unmodified.
 
-It talks to the instabox API (`https://api.box.instacloud.com`, or
+It talks to the instabox API (`https://api.instabox.sh`, or
 `INSTABOX_SERVER`) directly and drives the `herdr` CLI (saved machines,
 workspaces, notifications). The instabox CLI is not needed; the plugin has its
 own sign-in, separate from the CLI's. Linux and macOS.

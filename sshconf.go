@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -113,6 +114,29 @@ func writeHostBlock(m Machine) error {
 	fmt.Fprintf(&b, "  IdentityFile %s\n  CertificateFile %s\n  IdentitiesOnly yes\n", keyPath(), certPath(m.ID))
 	fmt.Fprintf(&b, "  UserKnownHostsFile %s\n  StrictHostKeyChecking yes\n  UpdateHostKeys no\n", knownHostsPath())
 	return writeFileAtomic(hostFile(m.ID), []byte(b.String()), 0o600)
+}
+
+// hostBlockCurrent reports whether the machine's Host block names the gateway
+// its latest certificate was issued for. A renewed certificate can come with a
+// new gateway, and then the block is rewritten.
+func hostBlockCurrent(id string) bool {
+	block, err := os.ReadFile(hostFile(id))
+	if err != nil {
+		return false
+	}
+	data, err := os.ReadFile(certMetaPath(id))
+	if err != nil {
+		return true // nothing to compare against; the next renewal writes it
+	}
+	var cm certMeta
+	if json.Unmarshal(data, &cm) != nil || cm.Host == "" {
+		return true
+	}
+	port := cm.Port
+	if port == 0 {
+		port = 22
+	}
+	return strings.Contains(string(block), fmt.Sprintf("  HostName %s\n  Port %d\n", cm.Host, port))
 }
 
 func hasHostBlock(id string) bool {

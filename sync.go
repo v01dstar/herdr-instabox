@@ -156,12 +156,15 @@ func reconcileOne(m Machine, p Profile, has bool, st State) error {
 			return nil
 		}
 		return addMachine(m, label)
-	case want && !p.Enabled:
+	case want:
+		// A connected machine's block can go stale too, when the gateway moves.
 		if err := ensureHostBlock(m); err != nil {
 			return err
 		}
-		if _, err := herdr("machine", "enable", p.ID); err != nil {
-			return err
+		if !p.Enabled {
+			if _, err := herdr("machine", "enable", p.ID); err != nil {
+				return err
+			}
 		}
 	case !want && has && p.Enabled:
 		if _, err := herdr("machine", "disable", p.ID); err != nil {
@@ -228,7 +231,7 @@ func readdLocked(m Machine) error {
 }
 
 func ensureHostBlock(m Machine) error {
-	if hasHostBlock(m.ID) {
+	if hasHostBlock(m.ID) && hostBlockCurrent(m.ID) {
 		return nil
 	}
 	if _, err := withInclude(""); err != nil {

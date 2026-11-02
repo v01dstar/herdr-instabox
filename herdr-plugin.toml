@@ -1,8 +1,8 @@
 id = "v01dstar.instabox"
 name = "Instabox"
-version = "0.4.0"
+version = "0.4.1"
 min_herdr_version = "0.9.0"
-description = "instabox cloud machines in herdr: sign in, create, start, stop, copy and connect them"
+description = "instabox cloud machines in herdr: configurable templates/snapshots, Secrets, env and workspace cwd"
 platforms = ["linux", "macos"]
 
 [[build]]

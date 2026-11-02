@@ -301,7 +301,7 @@ func runCreate(j *Job, progress func(string, ...any)) (string, error) {
 	} else {
 		progress("Creating instabox machine %s…", j.Name)
 	}
-	op, err := createMachine(j.Name, HerdrTemplate, j.Snapshot)
+	op, err := createMachine(j.Name, "", j.Snapshot)
 	if err != nil {
 		return "", err
 	}

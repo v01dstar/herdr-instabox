@@ -102,6 +102,44 @@ Things a plugin cannot do with herdr's current plugin API:
   and a remote machine's server has neither the binding nor the plugin.
   Switch to Local in the sidebar first.
 
+
+
+## Configuration (fork)
+
+The fork reads `HERDR_PLUGIN_CONFIG_DIR/config.json` (normally
+`~/.config/herdr/plugins/config/v01dstar.instabox/config.json`) so a deployment
+can point the plugin at a prepared base snapshot and wider machine set without
+changing code. Every field is optional; without the file the plugin behaves like
+upstream (the `herdr` template, no Secrets or env).
+
+```json
+{
+  "templates": ["agent-browser", "herdr"],
+  "snapshotPrefixes": ["1984-"],
+  "metadata": { "purpose": "1984", "herdr": "true" },
+  "secrets": ["GH_TOKEN"],
+  "env": { "APP_ENV": "development" },
+  "envFile": "/home/me/instabox/box.env",
+  "defaultTemplate": "agent-browser",
+  "defaultSnapshot": "1984-ready",
+  "defaultCwd": "/data/workspace/bigbrother",
+  "workspaces": [
+    { "id": "bigbrother", "title": "BigBrother", "cwd": "/data/workspace/bigbrother" }
+  ]
+}
+```
+
+- `templates` / `metadata`: which machines are synced into Herdr. A machine
+  matching either is included.
+- `snapshotPrefixes`: snapshots that are offered as create sources in addition
+  to snapshots whose template is listed.
+- `secrets`, `env`, `envFile`: sent on every create (`envFile` is read at create
+  time; `env` wins on collisions).
+- `defaultTemplate`, `defaultSnapshot`: used when a create names neither.
+  `defaultSnapshot` wins when a snapshot exists.
+- `defaultCwd` / `workspaces`: `new-workspace` passes `--cwd`; a keybinding can
+  call `bin/herdr-instabox new-workspace /data/workspace/mcps` for another repo.
+
 ## Development
 
 ```bash

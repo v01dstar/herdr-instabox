@@ -253,17 +253,18 @@ func waitOperation(op Operation) (Operation, error) {
 	return op, nil
 }
 
-// listMachines returns the account's herdr machines. Machines on other
-// templates (orca, universal, ...) have no herdr session, so the plugin leaves
-// them to the dashboard and the instabox CLI.
+// listMachines returns the account's machines that belong to this plugin's
+// fleet. By default that is the herdr template; config.json can widen it to
+// other templates or to machines carrying configured metadata labels.
 func listMachines() ([]Machine, error) {
 	all, err := listAllMachines()
 	if err != nil {
 		return nil, err
 	}
+	cfg := loadConfig()
 	var machines []Machine
 	for _, m := range all {
-		if m.Template != nil && m.Template.ID == HerdrTemplate {
+		if cfg.matchesMachine(m) {
 			machines = append(machines, m)
 		}
 	}
@@ -328,11 +329,27 @@ func getUsage() (Usage, error) {
 }
 
 func createMachine(name, template, snapshot string) (Operation, error) {
-	in := map[string]string{"name": name}
+	cfg := loadConfig()
+	if snapshot == "" {
+		snapshot = cfg.DefaultSnapshot
+	}
+	if template == "" {
+		template = cfg.DefaultTemplate
+	}
+	in := map[string]any{"name": name}
 	if snapshot != "" {
 		in["snapshotId"] = snapshot
 	} else {
 		in["templateId"] = template
+	}
+	if len(cfg.Secrets) > 0 {
+		in["secrets"] = cfg.Secrets
+	}
+	if len(cfg.Env) > 0 {
+		in["env"] = cfg.Env
+	}
+	if len(cfg.Metadata) > 0 {
+		in["metadata"] = cfg.Metadata
 	}
 	var op Operation
 	err := call(request{method: http.MethodPost, path: "/v1/machines", in: in, out: &op, auth: true, mutate: true})

@@ -3,7 +3,7 @@
 //
 //	herdr-instabox [ui]                   the remotes/snapshots/account settings pane
 //	herdr-instabox open [tab]             open the settings pane (plugin action)
-//	herdr-instabox new-workspace          new workspace on the default machine
+//	herdr-instabox new-workspace [CWD]    new workspace on the default machine
 //	herdr-instabox sync [--if-stale]      reconcile herdr with instabox (hooks)
 //	herdr-instabox job ID                 run a background job (internal)
 //	herdr-instabox login [github|google] sign in (run in the pane's terminal)
@@ -38,7 +38,7 @@ func main() {
 	case "open":
 		err = openPane(arg(2))
 	case "new-workspace":
-		err = newWorkspace()
+		err = newWorkspace(arg(2))
 	case "sync":
 		if arg(2) == "--if-stale" {
 			err = syncIfStale()
@@ -80,16 +80,28 @@ func openPane(tab string) error {
 	return cmd.Run()
 }
 
-// newWorkspace opens a workspace on the default machine. It never starts a
-// machine; when the default is not connected it explains why instead.
-func newWorkspace() error {
+// newWorkspace opens a workspace on the default machine, in cwd when one is
+// given (or the configured DefaultCwd). It never starts a machine; when the
+// default is not connected it explains why instead.
+func newWorkspace(cwd ...string) error {
 	st := readState()
 	target, label, problem := defaultTarget(st)
 	if problem != "" {
 		notify("New workspace", problem)
 		return nil
 	}
-	args := []string{"workspace", "create", "--focus"}
+	dir := ""
+	if len(cwd) > 0 {
+		dir = cwd[0]
+	}
+	if dir == "" {
+		dir = loadConfig().DefaultCwd
+	}
+	args := []string{"workspace", "create"}
+	if dir != "" {
+		args = append(args, "--cwd", dir)
+	}
+	args = append(args, "--focus")
 	if target != "" {
 		args = append([]string{"--machine", target}, args...)
 	}

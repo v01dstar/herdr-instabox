@@ -8,18 +8,21 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 )
 
-const accountNote = "This sign-in belongs to herdr; the instabox CLI has its own. Sign in opens your browser; over SSH or without a browser it shows a code to enter instead (GitHub only)."
+const accountNote = "Use [ / ] to select an account profile. Each keeps its own sign-in, machines, Secrets config, SSH keys and renewal; other profiles stay connected. The instabox CLI has a separate login. Sign in opens a browser or shows a device code (GitHub only)."
 
 func (m model) accountActions() []action {
 	if m.acct.SignedIn() || (m.acct.Err != nil && !m.acct.SignedOut) {
 		return []action{
-			{kind: aSwitch, label: "Switch account…"},
+			{kind: aSwitch, label: "Sign in again with GitHub…"},
+			{kind: aSignInGoogle, label: "Sign in again with Google…"},
 			{kind: aSignOut, label: "Sign out…"},
+			{kind: aAddAccount, label: "Add another account…"},
 		}
 	}
 	return []action{
 		{kind: aSignIn, label: "Sign in with GitHub"},
 		{kind: aSignInGoogle, label: "Sign in with Google"},
+		{kind: aAddAccount, label: "Add another account…"},
 	}
 }
 
@@ -28,9 +31,9 @@ func (m model) accountSummary() string {
 	case !m.checked:
 		return "Checking your instabox sign-in…"
 	case m.acct.SignedIn():
-		return fmt.Sprintf("Signed in as @%s on %s.", m.acct.Login, m.acct.Server)
+		return fmt.Sprintf("Profile %s: @%s · workspace %s · %s.", activeAccount(), m.acct.Login, m.acct.OrgID, m.acct.Server)
 	case m.acct.SignedOut:
-		return fmt.Sprintf("Not signed in to instabox (%s).", m.acct.Server)
+		return fmt.Sprintf("Profile %s: not signed in to instabox (%s).", activeAccount(), m.acct.Server)
 	}
 	return fmt.Sprintf("Signed in on %s, but the account could not be checked: %v", m.acct.Server, m.acct.Err)
 }
@@ -68,6 +71,15 @@ func (m model) runAccountAction() (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 	switch acts[m.accAc].kind {
+	case aAddAccount:
+		self, err := os.Executable()
+		if err != nil {
+			m.say(msgErr, "%v", err)
+			return m, nil
+		}
+		return m, interactive(self, []string{"account", "add"}, func() (string, error) {
+			return "Account profile added. Use [ / ] to select it, then sign in.", nil
+		})
 	case aSignIn, aSwitch:
 		return m.signIn("github")
 	case aSignInGoogle:
@@ -77,7 +89,7 @@ func (m model) runAccountAction() (tea.Model, tea.Cmd) {
 		m.dialog = &dialog{confirm: &confirm{
 			title: "sign out of instabox",
 			verb:  "sign out",
-			body:  fmt.Sprintf("Sign out of instabox on %s? This revokes herdr's sign-in on the server. Herdr forgets the instabox machines and removes their SSH config and keys; the machines keep running, and signing in again brings them back. The instabox CLI's own sign-in is not affected.", server),
+			body:  fmt.Sprintf("Sign out of profile %s on %s? Only this profile's sign-in, machines and SSH configuration are removed. Its cloud machines keep running. Other account profiles and the instabox CLI's sign-in are not affected.", activeAccount(), server),
 			run: func(m *model) tea.Cmd {
 				m.say(msgInfo, "Signing out…")
 				return quick(true, func() (string, error) {
@@ -100,21 +112,17 @@ func (m model) runAccountAction() (tea.Model, tea.Cmd) {
 }
 
 // signIn hands the terminal to `herdr-instabox login`, which opens the browser
-// or shows a device code. Switching accounts first clears the old account's machines.
+// or shows a device code. Setup offers a safe config only when none exists.
 func (m model) signIn(provider string) (tea.Model, tea.Cmd) {
-	if m.acct.SignedIn() {
-		if err := cleanupLocal(); err != nil {
-			m.say(msgErr, "%v", err)
-			return m, nil
-		}
-	}
+	// Keep existing connections intact until the candidate login has passed
+	// this profile's identity check; a wrong-account browser choice is harmless.
 	self, err := os.Executable()
 	if err != nil {
 		m.say(msgErr, "%v", err)
 		return m, nil
 	}
 	m.say(msgInfo, "Starting sign-in…")
-	return m, interactive(self, []string{"login", provider}, func() (string, error) {
+	return m, interactive(self, []string{"setup", provider}, func() (string, error) {
 		acct := whoami()
 		if !acct.SignedIn() {
 			return "", fmt.Errorf("sign-in did not complete")

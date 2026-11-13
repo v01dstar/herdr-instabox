@@ -1,8 +1,8 @@
 id = "v01dstar.instabox"
 name = "Instabox"
-version = "0.4.0"
+version = "0.5.1"
 min_herdr_version = "0.9.0"
-description = "instabox cloud machines in herdr: sign in, create, start, stop, copy and connect them"
+description = "create and manage instabox cloud machines, persistent workspaces and reusable snapshots in herdr"
 platforms = ["linux", "macos"]
 
 [[build]]
@@ -37,6 +37,18 @@ id = "new-workspace"
 title = "New workspace on the default machine"
 contexts = ["workspace"]
 command = ["bin/herdr-instabox", "new-workspace"]
+
+[[actions]]
+id = "setup"
+title = "Set up an InstaBox account"
+contexts = ["workspace"]
+command = ["bin/herdr-instabox", "open", "account"]
+
+[[actions]]
+id = "doctor"
+title = "InstaBox local diagnostics (read-only)"
+contexts = ["workspace"]
+command = ["bin/herdr-instabox", "doctor", "--json"]
 
 # Switch these to placement = "popup" once the installed herdr supports it.
 [[panes]]

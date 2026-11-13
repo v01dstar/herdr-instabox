@@ -20,6 +20,7 @@ import (
 // closed becomes a herdr notification.
 
 type Job struct {
+	Identity     *Identity `json:"identity,omitempty"`
 	ID           string    `json:"id"`
 	Kind         string    `json:"kind"`
 	MachineID    string    `json:"machineId,omitempty"`
@@ -93,7 +94,7 @@ func listJobs() []Job {
 			continue
 		}
 		if j.Status == "running" && !processAlive(j.PID) && time.Since(j.Updated) > 5*time.Second {
-			j.Status, j.Result = "failed", "The operation stopped unexpectedly."
+			j.Status, j.Result = "failed", "The operation stopped unexpectedly. Refresh this profile's machines/snapshots before retrying; the cloud operation may have completed."
 			_ = j.save()
 		}
 		if j.Status != "running" && time.Since(j.Updated) > 24*time.Hour {
@@ -116,6 +117,11 @@ func markJobSeen(id string) {
 
 // startJob records the job and launches its detached runner.
 func startJob(j Job) (Job, error) {
+	scope, err := currentIdentity()
+	if err != nil {
+		return j, err
+	}
+	j.Identity = &scope
 	var b [6]byte
 	_, _ = rand.Read(b[:])
 	j.ID = time.Now().Format("20060102-150405") + "-" + hex.EncodeToString(b[:])
@@ -137,7 +143,7 @@ func startJob(j Job) (Job, error) {
 	cmd.Stdout, cmd.Stderr = log, log
 	detach(cmd)
 	if err := cmd.Start(); err != nil {
-		j.Status, j.Result = "failed", err.Error()
+		j.Status, j.Result = "failed", fmt.Sprintf("Profile %s: %v", activeAccount(), err)
 		_ = j.save()
 		return j, err
 	}
@@ -167,9 +173,9 @@ func runJob(id string) error {
 	}
 	j.Progress = ""
 	if !uiAlive() {
-		title := "instabox"
+		title := "instabox: " + activeAccount()
 		if j.Status == "failed" {
-			title = "instabox: operation failed"
+			title += ": operation failed"
 		}
 		notify(title, j.Result)
 		j.Seen = true
@@ -178,6 +184,18 @@ func runJob(id string) error {
 }
 
 func (j *Job) run(progress func(string, ...any)) (string, error) {
+	if _, err := readConfig(configPath()); err != nil {
+		return "", err
+	}
+	if j.Identity != nil {
+		scope, err := currentIdentity()
+		if err != nil {
+			return "", err
+		}
+		if scope != *j.Identity {
+			return "", errors.New("job identity/workspace changed; submit it again from the intended account profile")
+		}
+	}
 	name := j.MachineName
 	switch j.Kind {
 	case jobCreate:
@@ -301,7 +319,7 @@ func runCreate(j *Job, progress func(string, ...any)) (string, error) {
 	} else {
 		progress("Creating instabox machine %s…", j.Name)
 	}
-	op, err := createMachine(j.Name, HerdrTemplate, j.Snapshot)
+	op, err := createMachine(j.Name, "", j.Snapshot)
 	if err != nil {
 		return "", err
 	}

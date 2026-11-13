@@ -26,7 +26,12 @@ type Profile struct {
 }
 
 // MachineID is the instabox machine a managed profile stands for.
-func (p Profile) MachineID() (string, bool) { return strings.CutPrefix(p.Target, TargetPrefix) }
+func (p Profile) MachineID() (string, bool) {
+	if activeAccount() == personalAccount && strings.HasPrefix(p.Target, TargetPrefix+"account-") {
+		return "", false
+	}
+	return strings.CutPrefix(p.Target, managedTargetPrefix())
+}
 
 func herdrBin() string {
 	if bin := os.Getenv("HERDR_BIN_PATH"); bin != "" {
@@ -59,7 +64,7 @@ func splitProfiles(all []Profile) (managed map[string]Profile, ssh []Profile) {
 			if q, dup := managed[id]; !dup || (p.Selected && !q.Selected) {
 				managed[id] = p
 			}
-		} else {
+		} else if !strings.HasPrefix(p.Target, TargetPrefix) {
 			ssh = append(ssh, p)
 		}
 	}

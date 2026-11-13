@@ -3,7 +3,7 @@
 //
 //	herdr-instabox [ui]                   the remotes/snapshots/account settings pane
 //	herdr-instabox open [tab]             open the settings pane (plugin action)
-//	herdr-instabox new-workspace          new workspace on the default machine
+//	herdr-instabox new-workspace [CWD]    new workspace on the default machine
 //	herdr-instabox sync [--if-stale]      reconcile herdr with instabox (hooks)
 //	herdr-instabox job ID                 run a background job (internal)
 //	herdr-instabox login [github|google] sign in (run in the pane's terminal)
@@ -12,6 +12,8 @@
 package main
 
 import (
+	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -21,6 +23,40 @@ import (
 )
 
 func main() {
+	args := os.Args[1:]
+	if len(args) > 0 && (args[0] == "--help" || args[0] == "-h" || args[0] == "help") {
+		fmt.Print(helpText)
+		return
+	}
+	explicitAccount := false
+	name := activeAccount()
+	if len(args) > 0 && args[0] == "--account" {
+		if len(args) < 2 {
+			fmt.Fprintln(os.Stderr, "herdr-instabox: --account needs a profile name")
+			os.Exit(2)
+		}
+		name, explicitAccount, args = args[1], true, args[2:]
+	}
+	if !explicitAccount && os.Getenv("HERDR_INSTABOX_ACCOUNT") == "" &&
+		(len(args) == 0 || args[0] == "ui" || args[0] == "open" || args[0] == "new-workspace") {
+		name = selectedAccount()
+	}
+	if err := prepareAccount(name); err != nil {
+		fmt.Fprintln(os.Stderr, "herdr-instabox:", err)
+		os.Exit(1)
+	}
+	if len(args) > 0 && (args[0] == "--help" || args[0] == "-h" || args[0] == "help") {
+		fmt.Print(helpText)
+		return
+	}
+	// Keep diagnostics and sign-out available even when configuration is broken.
+	if len(args) == 0 || (args[0] != "doctor" && args[0] != "logout" && args[0] != "account" && args[0] != "install-keys" && args[0] != "ensure-cert" && args[0] != "sync" && args[0] != "job") {
+		if _, err := readConfig(configPath()); err != nil {
+			fmt.Fprintln(os.Stderr, "herdr-instabox:", err)
+			os.Exit(1)
+		}
+	}
+	os.Args = append([]string{os.Args[0]}, args...)
 	cmd := "ui"
 	if len(os.Args) > 1 {
 		cmd = os.Args[1]
@@ -33,22 +69,56 @@ func main() {
 	}
 	var err error
 	switch cmd {
+	case "doctor":
+		err = doctor(os.Stdout, os.Args[2:])
+	case "setup":
+		err = setup(os.Stdin, os.Stdout, arg(2))
 	case "ui":
-		_, err = tea.NewProgram(newModel(arg(2)), tea.WithAltScreen(), tea.WithMouseCellMotion()).Run()
+		if err = selectAccount(activeAccount()); err != nil {
+			break
+		}
+		var result tea.Model
+		result, err = tea.NewProgram(newModel(arg(2)), tea.WithAltScreen(), tea.WithMouseCellMotion()).Run()
+		if m, ok := result.(model); err == nil && ok && m.nextAccount != "" {
+			err = restartAccountUI(m.nextAccount, tabNames[m.tab])
+		}
+	case "account":
+		err = accountCommand(os.Args[2:])
+	case "whoami":
+		a := whoami()
+		if a.Err != nil {
+			err = a.Err
+		} else {
+			var scope Identity
+			if a.SignedIn() {
+				scope, err = currentIdentity()
+				if err != nil {
+					break
+				}
+			}
+			err = json.NewEncoder(os.Stdout).Encode(map[string]any{"account": activeAccount(), "login": a.Login, "userId": a.UserID, "server": a.Server, "orgId": scope.OrgID, "signedIn": a.SignedIn()})
+		}
+	case "logout":
+		err = errors.Join(cleanupLocal(), signOut())
 	case "open":
-		err = openPane(arg(2))
+		if err = selectAccount(activeAccount()); err == nil {
+			err = openPane(arg(2))
+		}
 	case "new-workspace":
-		err = newWorkspace()
+		err = newWorkspace(arg(2))
 	case "sync":
 		if arg(2) == "--if-stale" {
 			err = syncIfStale()
 		} else {
 			err = syncAll().Err
 		}
+		if !explicitAccount {
+			err = errors.Join(err, syncOtherAccounts(arg(2) == "--if-stale"))
+		}
 	case "job":
 		err = runJob(arg(2))
 	case "ensure-cert":
-		runEnsureCert(arg(2), arg(3))
+		runEnsureCert(arg(2), arg(3), arg(4), arg(5))
 	case "login":
 		err = login(arg(2))
 	case "install-keys":
@@ -80,16 +150,32 @@ func openPane(tab string) error {
 	return cmd.Run()
 }
 
-// newWorkspace opens a workspace on the default machine. It never starts a
-// machine; when the default is not connected it explains why instead.
-func newWorkspace() error {
+// newWorkspace opens a workspace on the default machine, in cwd when one is
+// given (or the configured DefaultCwd). It never starts a machine; when the
+// default is not connected it explains why instead.
+func newWorkspace(cwd ...string) error {
 	st := readState()
 	target, label, problem := defaultTarget(st)
 	if problem != "" {
 		notify("New workspace", problem)
 		return nil
 	}
-	args := []string{"workspace", "create", "--focus"}
+	dir := ""
+	if len(cwd) > 0 {
+		dir = cwd[0]
+	}
+	if dir == "" {
+		cfg, err := readConfig(configPath())
+		if err != nil {
+			return err
+		}
+		dir = cfg.DefaultCwd
+	}
+	args := []string{"workspace", "create"}
+	if dir != "" {
+		args = append(args, "--cwd", dir)
+	}
+	args = append(args, "--focus")
 	if target != "" {
 		args = append([]string{"--machine", target}, args...)
 	}

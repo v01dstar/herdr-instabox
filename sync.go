@@ -34,6 +34,10 @@ type syncResult struct {
 // take turns.
 func syncAll() syncResult {
 	var r syncResult
+	if _, err := readConfig(configPath()); err != nil {
+		r.Err, r.Note = err, "invalid configuration"
+		return r
+	}
 	if err := withMachinesLock(func() error { r = syncLocked(); return nil }); err != nil {
 		r.Err = err
 	}

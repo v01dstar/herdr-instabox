@@ -106,6 +106,7 @@ func (m model) View() string {
 	case m.checked && m.acct.SignedOut:
 		badge = sDim.Render("not signed in")
 	}
+	badge = activeAccount() + " · " + badge + "  [ / ]"
 	var tabs strings.Builder
 	tabs.WriteString(" ")
 	x := 1

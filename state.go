@@ -90,7 +90,24 @@ func withLock(name string, f func() error) error {
 // withMachinesLock serializes every change to herdr's saved machines. Without
 // it, overlapping syncs (startup, workspace events, the open pane) each see a
 // machine missing and each add it.
-func withMachinesLock(f func() error) error { return withLock("machines.lock", f) }
+func withMachinesLock(f func() error) error { return withRootLock("machines.lock", f) }
+
+// All accounts write to the same Herdr registry and ~/.ssh/config.
+func withRootLock(name string, f func() error) error {
+	if err := os.MkdirAll(accountsRoot(), 0o700); err != nil {
+		return err
+	}
+	lock, err := os.OpenFile(filepath.Join(accountsRoot(), name), os.O_CREATE|os.O_RDWR, 0o600)
+	if err != nil {
+		return err
+	}
+	defer lock.Close()
+	if err := syscall.Flock(int(lock.Fd()), syscall.LOCK_EX); err != nil {
+		return err
+	}
+	defer syscall.Flock(int(lock.Fd()), syscall.LOCK_UN)
+	return f()
+}
 
 // updateState applies f to the state under an exclusive lock.
 func updateState(f func(*State)) error {

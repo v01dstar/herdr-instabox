@@ -22,7 +22,7 @@ type confirm struct {
 }
 
 func confirmDialog(title, verb, body string, j Job) *dialog {
-	return &dialog{confirm: &confirm{title: title, verb: verb, body: body, job: &j}}
+	return &dialog{confirm: &confirm{title: title, verb: verb, body: "Profile " + activeAccount() + ": " + body, job: &j}}
 }
 
 type chooser struct {
@@ -138,10 +138,19 @@ func (f *form) refreshPrimary() {
 // ---- opening dialogs ----
 
 func (m model) openAdd(snapshotID string) (tea.Model, tea.Cmd) {
+	cfg, err := readConfig(configPath())
+	if err != nil {
+		m.say(msgErr, "%v", err)
+		return m, nil
+	}
 	f := newForm(formAdd, "add remote", "create and connect")
 	f.addChoice("Provider", []string{"instabox", "SSH"}, []string{"instabox", "ssh"}, 0)
 	f.addText("Name", "", "my-machine")
-	options, values, sel := []string{"Latest herdr template"}, []string{""}, 0
+	defaultSource := "Template: " + cfg.DefaultTemplate
+	if cfg.DefaultSnapshot != "" {
+		defaultSource = "Default snapshot: " + cfg.DefaultSnapshot
+	}
+	options, values, sel := []string{defaultSource}, []string{""}, 0
 	for _, im := range m.snapshots {
 		label := im.Name + " · " + im.CreatedAt.Local().Format("2006-01-02")
 		// Name the source machine only while it exists; a deleted one says nothing useful.
@@ -165,16 +174,47 @@ func (m model) openAdd(snapshotID string) (tea.Model, tea.Cmd) {
 }
 
 func (m model) addHint(f *form) string {
+	if !m.acct.SignedIn() || f.value(0) == "ssh" {
+		return m.addSourceHint(f, Config{})
+	}
+	cfg, err := readConfig(configPath())
+	if err != nil {
+		return "Cannot create: " + err.Error()
+	}
+	snapshot := f.value(2)
+	if snapshot == "" {
+		snapshot = cfg.DefaultSnapshot
+	}
+	secrets := cfg.Secrets
+	if profile, ok := cfg.SnapshotProfiles[snapshot]; ok {
+		secrets = profile.Secrets
+	}
+	selection := "none selected"
+	if len(secrets) > 0 {
+		selection = strings.Join(secrets, ", ")
+	}
+	vault := "platform default"
+	if cfg.DisableVault {
+		vault = "disabled"
+	}
+	return fmt.Sprintf("Profile %s · workspace %s. Secrets: %s. Vault: %s.\n%s", activeAccount(), m.acct.OrgID, selection, vault, m.addSourceHint(f, cfg))
+}
+
+func (m model) addSourceHint(f *form, cfg Config) string {
+	snapshot := f.value(2)
+	if snapshot == "" {
+		snapshot = cfg.DefaultSnapshot
+	}
 	switch {
 	case !m.acct.SignedIn():
 		return "Not signed in to instabox. Press sign in to continue in your browser."
-	case f.value(2) != "":
-		if sn, ok := m.snapshotByID(f.value(2)); ok && !sn.HasData() {
+	case snapshot != "":
+		if sn, ok := m.snapshotByID(snapshot); ok && !sn.HasData() {
 			return fmt.Sprintf("Creates an instabox machine from snapshot %s: the packages and system configuration saved in it, with a new, empty /data (no home directory files, logins or workspace).", sn.Name)
 		}
-		return fmt.Sprintf("Creates an instabox machine from snapshot %s: its software, settings, and the repos, home files and logins on /data.", m.snapshotName(f.value(2)))
+		return fmt.Sprintf("Creates an instabox machine from snapshot %s. Included disks and any baked-in logins are copied; audit the source before reuse.", m.snapshotName(snapshot))
 	}
-	return "Creates an instabox machine from the herdr template with its default size and a persistent disk. Closing Herdr keeps it running; stop it from instabox settings. Your existing instabox machines are listed on the remotes tab on their own."
+	return fmt.Sprintf("Creates an instabox machine from template %s with its default size and a persistent disk. Closing Herdr keeps it running; stop it from instabox settings.", cfg.DefaultTemplate)
 }
 
 func sshForm() *form {

@@ -1,0 +1,34 @@
+name: Bug report
+description: Report a reproducible problem (never include credentials).
+body:
+  - type: markdown
+    attributes:
+      value: |
+        For security vulnerabilities, follow SECURITY.md instead of posting details here.
+        Do not attach credentials.json, private keys, env files, auth URLs, device codes, or unredacted job logs.
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: OS/architecture, Herdr version, plugin commit/version, install method.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Steps to reproduce
+      description: Include whether Local or a remote was selected, and whether one or several account profiles are configured. Use placeholder names.
+    validations:
+      required: true
+  - type: textarea
+    id: outcome
+    attributes:
+      label: Expected and actual result
+    validations:
+      required: true
+  - type: textarea
+    id: diagnostics
+    attributes:
+      label: Sanitized diagnostics
+      description: Optional output from doctor. Review local paths and messages before sharing. Say whether whoami succeeds, but do not post personal identifiers or raw auth files.
+      render: text

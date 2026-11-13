@@ -78,7 +78,8 @@ type request struct {
 	method, path string
 	in, out      any
 	auth         bool
-	mutate       bool // sends an Idempotency-Key
+	token        string // Candidate credential verification only; never serialized/logged.
+	mutate       bool   // sends an Idempotency-Key
 	server       string
 	timeout      time.Duration
 }
@@ -95,8 +96,34 @@ func call(r request) error {
 
 func send(r request, refresh bool) error {
 	server := r.server
+	if server == "" && r.auth {
+		// Authenticate only to the issuer stored with this profile's sign-in,
+		// never to a host CLI/server override from another account context.
+		c, err := loadCredentials()
+		if err != nil {
+			return err
+		}
+		if c != nil {
+			server = c.Server
+		}
+	}
 	if server == "" {
 		server = serverURL()
+	}
+	token := r.token
+	if r.auth {
+		var err error
+		token, err = accessToken(refresh)
+		if err != nil {
+			return err
+		}
+		scope, err := verifyIdentity(&Credentials{Server: server, AccessToken: token})
+		if err != nil {
+			return err
+		}
+		if err := guardScopedRequest(&r, token, server, scope); err != nil {
+			return err
+		}
 	}
 	timeout := r.timeout
 	if timeout == 0 {
@@ -124,12 +151,8 @@ func send(r request, refresh bool) error {
 	if r.mutate {
 		req.Header.Set("Idempotency-Key", newIdempotencyKey())
 	}
-	if r.auth {
-		tok, err := accessToken(refresh)
-		if err != nil {
-			return err
-		}
-		req.Header.Set("Authorization", "Bearer "+tok)
+	if token != "" {
+		req.Header.Set("Authorization", "Bearer "+token)
 	}
 	hc := *httpClient
 	hc.Timeout = timeout
@@ -253,17 +276,25 @@ func waitOperation(op Operation) (Operation, error) {
 	return op, nil
 }
 
-// listMachines returns the account's herdr machines. Machines on other
-// templates (orca, universal, ...) have no herdr session, so the plugin leaves
-// them to the dashboard and the instabox CLI.
+// listMachines returns the account's machines that belong to this plugin's
+// fleet. By default that is the herdr template; config.json can widen it to
+// other templates or to machines carrying configured metadata labels.
 func listMachines() ([]Machine, error) {
+	cfg, err := readConfig(configPath())
+	if err != nil {
+		return nil, err
+	}
 	all, err := listAllMachines()
+	if err != nil {
+		return nil, err
+	}
+	scope, err := currentIdentity()
 	if err != nil {
 		return nil, err
 	}
 	var machines []Machine
 	for _, m := range all {
-		if m.Template != nil && m.Template.ID == HerdrTemplate {
+		if m.OrgID == scope.OrgID && cfg.matchesMachine(m) {
 			machines = append(machines, m)
 		}
 	}
@@ -297,6 +328,13 @@ func listAllMachines() ([]Machine, error) {
 func getMachine(id string) (Machine, error) {
 	var m Machine
 	err := call(request{method: http.MethodGet, path: machinePath(id, ""), out: &m, auth: true})
+	if err == nil {
+		var scope Identity
+		scope, err = currentIdentity()
+		if err == nil {
+			err = requireOrg(m.OrgID, scope)
+		}
+	}
 	return m, err
 }
 
@@ -328,14 +366,53 @@ func getUsage() (Usage, error) {
 }
 
 func createMachine(name, template, snapshot string) (Operation, error) {
-	in := map[string]string{"name": name}
+	cfg, err := readConfig(configPath())
+	if err != nil {
+		return Operation{}, err
+	}
+	if snapshot == "" {
+		snapshot = cfg.DefaultSnapshot
+	}
+	if template == "" {
+		template = cfg.DefaultTemplate
+	}
+	in := map[string]any{"name": name}
 	if snapshot != "" {
 		in["snapshotId"] = snapshot
 	} else {
 		in["templateId"] = template
 	}
+	if len(cfg.Secrets) > 0 {
+		in["secrets"] = cfg.Secrets
+	}
+	if len(cfg.Env) > 0 {
+		in["env"] = cfg.Env
+	}
+	if len(cfg.Metadata) > 0 {
+		in["metadata"] = cfg.Metadata
+	}
+	if cfg.DisableVault {
+		in["vault"] = false
+	}
+	if profile, ok := cfg.SnapshotProfiles[snapshot]; ok {
+		// Explicit empty selection is important: generic must not inherit auth.
+		secrets := profile.Secrets
+		if secrets == nil {
+			secrets = []string{}
+		}
+		in["secrets"] = secrets
+		in["envSecrets"] = []string{}
+		metadata := map[string]string{}
+		for k, v := range cfg.Metadata {
+			metadata[k] = v
+		}
+		for k, v := range profile.Metadata {
+			metadata[k] = v
+		}
+		in["metadata"] = metadata
+	}
 	var op Operation
-	err := call(request{method: http.MethodPost, path: "/v1/machines", in: in, out: &op, auth: true, mutate: true})
+	err = call(request{method: http.MethodPost, path: "/v1/machines", in: in, out: &op, auth: true, mutate: true})
 	return op, err
 }
 

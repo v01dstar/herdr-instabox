@@ -90,8 +90,9 @@ type model struct {
 	message string
 	kind    msgKind
 
-	dialog *dialog
-	hit    *hits
+	dialog      *dialog
+	hit         *hits
+	nextAccount string // Restart the UI process, never swap a live model's identity.
 }
 
 func newModel(tab string) model {
@@ -114,7 +115,13 @@ func tick() tea.Cmd {
 	return tea.Tick(time.Second, func(t time.Time) tea.Msg { return tickMsg(t) })
 }
 
-func doSync() tea.Msg { return syncedMsg(syncAll()) }
+func doSync() tea.Msg {
+	r := syncAll()
+	if err := syncOtherAccounts(true); r.Err == nil {
+		r.Err = err
+	}
+	return syncedMsg(r)
+}
 
 func loadTemplates() tea.Msg {
 	t, err := listTemplates()
@@ -278,6 +285,26 @@ func (m *model) clamp() {
 
 func (m model) key(k tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch k.String() {
+	case "[", "]":
+		names, err := accountNames()
+		if err != nil {
+			m.say(msgErr, "%v", err)
+			return m, nil
+		}
+		if len(names) < 2 {
+			m.say(msgInfo, "Add another account on the account tab first.")
+			return m, nil
+		}
+		for i, name := range names {
+			if name == activeAccount() {
+				d := 1
+				if k.String() == "[" {
+					d = -1
+				}
+				m.nextAccount = names[(i+d+len(names))%len(names)]
+				return m, tea.Quit
+			}
+		}
 	case "ctrl+c", "q":
 		return m, tea.Quit
 	case "esc":

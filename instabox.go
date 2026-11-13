@@ -33,6 +33,7 @@ func (t *TemplateRef) Label() string {
 }
 
 type Machine struct {
+	OrgID        string       `json:"orgId"`
 	ID           string       `json:"id"`
 	Name         string       `json:"name"`
 	State        string       `json:"state"`
@@ -57,7 +58,7 @@ type Machine struct {
 	CreatedAt time.Time `json:"createdAt"`
 }
 
-func (m Machine) Target() string { return TargetPrefix + m.ID }
+func (m Machine) Target() string { return managedTargetPrefix() + m.ID }
 
 type Template struct {
 	ID           string   `json:"id"`
@@ -77,6 +78,7 @@ func (t Template) Has(capability string) bool {
 }
 
 type Snapshot struct {
+	OrgID           string       `json:"orgId"`
 	ID              string       `json:"id"`
 	Name            string       `json:"name"`
 	Description     string       `json:"description"`
@@ -105,6 +107,7 @@ type Usage struct {
 
 // Account is who the plugin is signed in as.
 type Account struct {
+	OrgID                 string
 	Login, UserID, Server string
 	// SignedOut is a definite "nobody is signed in"; Err is any other failure,
 	// such as an unreachable server, which must not be mistaken for it.
@@ -156,19 +159,27 @@ func templateFor(templates []Template, ref *TemplateRef) (Template, bool) {
 // HerdrTemplate is the template the plugin creates machines from.
 const HerdrTemplate = "herdr"
 
-// listSnapshots returns the account's snapshots of herdr machines, newest
-// first. Snapshots of machines on other templates are not the plugin's to
-// offer: a machine made from one would not be a herdr machine.
+// listSnapshots returns the account's snapshots usable by this plugin's fleet,
+// newest first. By default that is snapshots of herdr machines; config.json can
+// widen it by template or by snapshot name prefix.
 func listSnapshots() ([]Snapshot, error) {
+	cfg, err := readConfig(configPath())
+	if err != nil {
+		return nil, err
+	}
 	var out struct {
 		Snapshots []Snapshot `json:"snapshots"`
 	}
 	if err := call(request{method: http.MethodGet, path: "/v1/snapshots", out: &out, auth: true}); err != nil {
 		return nil, err
 	}
+	scope, err := currentIdentity()
+	if err != nil {
+		return nil, err
+	}
 	var snapshots []Snapshot
 	for _, sn := range out.Snapshots {
-		if sn.Template != nil && sn.Template.ID == HerdrTemplate {
+		if sn.OrgID == scope.OrgID && cfg.matchesSnapshot(sn) {
 			snapshots = append(snapshots, sn)
 		}
 	}

@@ -1,0 +1,17 @@
+# InstaBox for Herdr
+
+Persistent InstaBox cloud machines as native Herdr SSH remotes. Stable plugin ID: v01dstar.instabox. No automatic local checkout upload or patch-back. Plugin auth is separate from the standalone InstaBox CLI.
+
+## Start here
+- README.md: installation, first run, multiple-account overview
+- docs/authentication.md: root environment, providers, profiles, identity/workspace policy
+- docs/configuration.md: strict JSON configuration reference
+- docs/usage.md: lifecycle and shortcuts
+- examples/README.md: copyable configurations and full workflows
+- docs/troubleshooting.md: diagnostics and recovery
+- docs/design.md: architecture and source map
+- docs/verification.md: offline versus live verification
+- CONTRIBUTING.md: development and invariants
+- SECURITY.md: trust boundaries and sensitive reports
+
+Prefer explicit --account NAME in scripts. Never print credentials or bypass identity guards. Before retrying an interrupted create/copy, inspect remote state. Closing settings or logging out does not stop cloud billing.

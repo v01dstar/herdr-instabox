@@ -23,7 +23,7 @@
   key installation, and logout remain available for recovery.
 - Unknown login providers are rejected before launching an authentication flow.
 - Interrupted job messages advise inspecting remote state before retrying.
-- Install instructions target this fork while preserving upstream identifiers.
+- Install instructions target the documented repository while preserving existing plugin identifiers.
 
 ## 0.5.1 — 2026-11-13
 

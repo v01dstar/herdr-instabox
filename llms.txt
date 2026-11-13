@@ -1,6 +1,6 @@
 # InstaBox for Herdr
 
-Persistent InstaBox cloud machines as native Herdr SSH remotes. This is the mdp fork of v01dstar/herdr-instabox. Stable plugin ID: v01dstar.instabox. No automatic local checkout upload or patch-back. Plugin auth is separate from the standalone InstaBox CLI.
+Persistent InstaBox cloud machines as native Herdr SSH remotes. Stable plugin ID: v01dstar.instabox. No automatic local checkout upload or patch-back. Plugin auth is separate from the standalone InstaBox CLI.
 
 ## Start here
 - README.md: installation, first run, multiple-account overview

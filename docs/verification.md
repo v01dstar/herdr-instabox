@@ -22,7 +22,7 @@ Use test accounts/workspaces and narrowly scoped Secrets. Obtain approval for bi
 
 Record date, OS/architecture, Herdr version, plugin commit, Go version, and which checks passed/failed. Keep user IDs, account logins, paths, and resource names redacted as appropriate.
 
-- [ ] Install this fork from a clean environment; verify the stable plugin ID and nonconflicting default keys.
+- [ ] Install the plugin from a clean environment; verify the stable plugin ID and nonconflicting default keys.
 - [ ] Open settings from Local and sign in through GitHub browser flow.
 - [ ] With no config, accept the safe starter; check `0600` file and no overwrite on a second setup.
 - [ ] Add work, sign in with Google, verify intended account/workspace; check personal remains connected.
@@ -56,5 +56,5 @@ For a release, capture settings/remotes with both account namespaces connected, 
 - [ ] Live checks above have a dated outcome, including unverified items.
 - [ ] README install target, manifest version, changelog, and examples agree.
 - [ ] Existing personal state/aliases remain compatible.
-- [ ] Upstream attribution is retained; licensing is explicitly resolved before redistribution under a new license.
+- [ ] Existing source notices are preserved; licensing is explicitly resolved before redistribution under a new license.
 - [ ] Release notes identify configuration validation changes and any migration needed.

@@ -34,7 +34,7 @@ You need **Herdr 0.9.0+**, **Go 1.27.1+** to build, OpenSSH (`ssh` and `ssh-keyg
 herdr plugin install mdp/herdr-instabox
 ```
 
-This is a fork of [v01dstar/herdr-instabox](https://github.com/v01dstar/herdr-instabox). The plugin ID remains **`v01dstar.instabox`** to preserve existing installations. Do not install both copies side by side; back up your config/state before replacing an existing installation.
+The plugin ID is **`v01dstar.instabox`**. If replacing an existing installation, back up your config/state first and keep only one copy installed.
 
 For a local checkout:
 
@@ -127,4 +127,4 @@ Tests use a fake InstaBox API and Herdr CLI—no cloud account needed. CI checks
 
 ### Acknowledgments
 
-Built on [v01dstar’s original plugin](https://github.com/v01dstar/herdr-instabox). Documentation and onboarding patterns were informed by the [Docker Sandboxes](https://github.com/dirien/herdr-sbx-plugin), [Blaxel](https://github.com/blaxel-ai/herdr-blaxel-sandbox-plugin), [Upstash Box](https://github.com/upstash/herdr-upstash-box), and [Vercel Sandbox](https://github.com/vercel-labs/herdr-vercel-sandbox-plugin) plugins. This integration is not an official Herdr product.
+Documentation and onboarding patterns were informed by the [Docker Sandboxes](https://github.com/dirien/herdr-sbx-plugin), [Blaxel](https://github.com/blaxel-ai/herdr-blaxel-sandbox-plugin), [Upstash Box](https://github.com/upstash/herdr-upstash-box), and [Vercel Sandbox](https://github.com/vercel-labs/herdr-vercel-sandbox-plugin) plugins. This integration is not an official Herdr product.

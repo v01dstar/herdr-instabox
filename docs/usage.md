@@ -58,7 +58,7 @@ command = "v01dstar.instabox.new-workspace"
 description = "new workspace on the default machine"
 ```
 
-These defaults are installed only if their keys/actions are not already bound. Built-in key conflicts are disabled by Herdr; choose unused chords. Removing custom bindings is manual. Keep the stable plugin ID even when installing this fork.
+These defaults are installed only if their keys/actions are not already bound. Built-in key conflicts are disabled by Herdr; choose unused chords. Removing custom bindings is manual. Use the plugin ID shown above when binding actions.
 
 ## Plugin limitations
 

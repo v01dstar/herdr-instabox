@@ -34,4 +34,4 @@ Changes to user-visible commands need help text, reference/recipe updates, and a
 
 Describe the user-visible problem, tests run, migration impact, and any unverified live behavior. For bugs, include OS, Herdr version, plugin commit, sanitized `doctor` output, and minimal reproduction steps. Use the [security policy](SECURITY.md) for sensitive reports.
 
-This fork retains upstream attribution and the original module/plugin identifiers for compatibility. The checkout does not currently declare a repository license; do not invent a license header or assume upstream code can be relicensed. Resolve licensing with the maintainers before a licensing/redistribution change.
+Keep existing module/plugin identifiers compatible with installed configurations. The checkout does not currently declare a repository license; resolve licensing with the maintainers before adding a license or changing redistribution terms. Preserve any existing source notices.

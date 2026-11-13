@@ -1,6 +1,6 @@
 # Examples
 
-These recipes are for this fork and its stable plugin ID `v01dstar.instabox`. JSON files contain **Secret names**, never tokens. Replace example names/paths with resources in your own InstaBox workspace.
+These recipes use the plugin ID `v01dstar.instabox`. JSON files contain **Secret names**, never tokens. Replace example names/paths with resources in your own InstaBox workspace.
 
 | Recipe | Files | Outcome |
 | --- | --- | --- |

@@ -45,6 +45,7 @@ const (
 	aSwitch
 	aSignOut
 	aSignInGoogle
+	aAddAccount
 )
 
 type action struct {

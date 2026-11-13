@@ -78,7 +78,8 @@ type request struct {
 	method, path string
 	in, out      any
 	auth         bool
-	mutate       bool // sends an Idempotency-Key
+	token        string // Candidate credential verification only; never serialized/logged.
+	mutate       bool   // sends an Idempotency-Key
 	server       string
 	timeout      time.Duration
 }
@@ -95,8 +96,34 @@ func call(r request) error {
 
 func send(r request, refresh bool) error {
 	server := r.server
+	if server == "" && r.auth {
+		// Authenticate only to the issuer stored with this profile's sign-in,
+		// never to a host CLI/server override from another account context.
+		c, err := loadCredentials()
+		if err != nil {
+			return err
+		}
+		if c != nil {
+			server = c.Server
+		}
+	}
 	if server == "" {
 		server = serverURL()
+	}
+	token := r.token
+	if r.auth {
+		var err error
+		token, err = accessToken(refresh)
+		if err != nil {
+			return err
+		}
+		scope, err := verifyIdentity(&Credentials{Server: server, AccessToken: token})
+		if err != nil {
+			return err
+		}
+		if err := guardScopedRequest(&r, token, server, scope); err != nil {
+			return err
+		}
 	}
 	timeout := r.timeout
 	if timeout == 0 {
@@ -124,12 +151,8 @@ func send(r request, refresh bool) error {
 	if r.mutate {
 		req.Header.Set("Idempotency-Key", newIdempotencyKey())
 	}
-	if r.auth {
-		tok, err := accessToken(refresh)
-		if err != nil {
-			return err
-		}
-		req.Header.Set("Authorization", "Bearer "+tok)
+	if token != "" {
+		req.Header.Set("Authorization", "Bearer "+token)
 	}
 	hc := *httpClient
 	hc.Timeout = timeout
@@ -262,9 +285,13 @@ func listMachines() ([]Machine, error) {
 		return nil, err
 	}
 	cfg := loadConfig()
+	scope, err := currentIdentity()
+	if err != nil {
+		return nil, err
+	}
 	var machines []Machine
 	for _, m := range all {
-		if cfg.matchesMachine(m) {
+		if m.OrgID == scope.OrgID && cfg.matchesMachine(m) {
 			machines = append(machines, m)
 		}
 	}
@@ -298,6 +325,13 @@ func listAllMachines() ([]Machine, error) {
 func getMachine(id string) (Machine, error) {
 	var m Machine
 	err := call(request{method: http.MethodGet, path: machinePath(id, ""), out: &m, auth: true})
+	if err == nil {
+		var scope Identity
+		scope, err = currentIdentity()
+		if err == nil {
+			err = requireOrg(m.OrgID, scope)
+		}
+	}
 	return m, err
 }
 
@@ -350,6 +384,26 @@ func createMachine(name, template, snapshot string) (Operation, error) {
 	}
 	if len(cfg.Metadata) > 0 {
 		in["metadata"] = cfg.Metadata
+	}
+	if cfg.DisableVault {
+		in["vault"] = false
+	}
+	if profile, ok := cfg.SnapshotProfiles[snapshot]; ok {
+		// Explicit empty selection is important: generic must not inherit auth.
+		secrets := profile.Secrets
+		if secrets == nil {
+			secrets = []string{}
+		}
+		in["secrets"] = secrets
+		in["envSecrets"] = []string{}
+		metadata := map[string]string{}
+		for k, v := range cfg.Metadata {
+			metadata[k] = v
+		}
+		for k, v := range profile.Metadata {
+			metadata[k] = v
+		}
+		in["metadata"] = metadata
 	}
 	var op Operation
 	err := call(request{method: http.MethodPost, path: "/v1/machines", in: in, out: &op, auth: true, mutate: true})

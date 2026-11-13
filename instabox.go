@@ -33,6 +33,7 @@ func (t *TemplateRef) Label() string {
 }
 
 type Machine struct {
+	OrgID        string       `json:"orgId"`
 	ID           string       `json:"id"`
 	Name         string       `json:"name"`
 	State        string       `json:"state"`
@@ -57,7 +58,7 @@ type Machine struct {
 	CreatedAt time.Time `json:"createdAt"`
 }
 
-func (m Machine) Target() string { return TargetPrefix + m.ID }
+func (m Machine) Target() string { return managedTargetPrefix() + m.ID }
 
 type Template struct {
 	ID           string   `json:"id"`
@@ -77,6 +78,7 @@ func (t Template) Has(capability string) bool {
 }
 
 type Snapshot struct {
+	OrgID           string       `json:"orgId"`
 	ID              string       `json:"id"`
 	Name            string       `json:"name"`
 	Description     string       `json:"description"`
@@ -167,9 +169,13 @@ func listSnapshots() ([]Snapshot, error) {
 		return nil, err
 	}
 	cfg := loadConfig()
+	scope, err := currentIdentity()
+	if err != nil {
+		return nil, err
+	}
 	var snapshots []Snapshot
 	for _, sn := range out.Snapshots {
-		if cfg.matchesSnapshot(sn) {
+		if sn.OrgID == scope.OrgID && cfg.matchesSnapshot(sn) {
 			snapshots = append(snapshots, sn)
 		}
 	}

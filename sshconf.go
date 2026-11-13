@@ -42,6 +42,13 @@ func sshIncluded() bool {
 // addInclude prepends the Include line to ~/.ssh/config. It must come first:
 // an Include after a Host line would only apply inside that Host block.
 func addInclude() error {
+	return withRootLock("ssh-config.lock", addIncludeLocked)
+}
+
+func addIncludeLocked() error {
+	if sshIncluded() {
+		return nil
+	}
 	path := userSSHConfig()
 	old, err := os.ReadFile(path)
 	if err != nil && !os.IsNotExist(err) {
@@ -64,6 +71,10 @@ func includeHeader() string { return includeComment + "\n" + includeLine() + "\n
 
 // removeInclude takes out what addInclude added and leaves the rest untouched.
 func removeInclude() error {
+	return withRootLock("ssh-config.lock", removeIncludeLocked)
+}
+
+func removeIncludeLocked() error {
 	path := userSSHConfig()
 	data, err := os.ReadFile(path)
 	if os.IsNotExist(err) {
@@ -107,8 +118,8 @@ func writeHostBlock(m Machine) error {
 	}
 	var b strings.Builder
 	fmt.Fprintf(&b, "# instabox machine %s (%s), managed by herdr-instabox\n", m.Name, m.ID)
-	fmt.Fprintf(&b, "Match host %s exec \"%s ensure-cert %s %s\"\n",
-		m.Target(), shellQuote(self), m.ID, shellQuote(stateDir()))
+	fmt.Fprintf(&b, "Match host %s exec \"%s ensure-cert %s %s %s %s\"\n",
+		m.Target(), shellQuote(self), m.ID, shellQuote(stateDir()), shellQuote(filepath.Dir(configPath())), shellQuote(activeAccount()))
 	fmt.Fprintf(&b, "Host %s\n", m.Target())
 	fmt.Fprintf(&b, "  HostName %s\n  Port %d\n  User %s\n", cm.Host, port, cm.Username)
 	fmt.Fprintf(&b, "  IdentityFile %s\n  CertificateFile %s\n  IdentitiesOnly yes\n", keyPath(), certPath(m.ID))
@@ -122,6 +133,10 @@ func writeHostBlock(m Machine) error {
 func hostBlockCurrent(id string) bool {
 	block, err := os.ReadFile(hostFile(id))
 	if err != nil {
+		return false
+	}
+	context := "ensure-cert " + id + " " + shellQuote(stateDir()) + " " + shellQuote(filepath.Dir(configPath())) + " " + shellQuote(activeAccount())
+	if !strings.Contains(string(block), context) {
 		return false
 	}
 	data, err := os.ReadFile(certMetaPath(id))
@@ -156,9 +171,33 @@ func shellQuote(s string) string {
 // (Match exec) before each connection. It renews the certificate only near
 // expiry and always succeeds: a failed renewal surfaces as an SSH
 // authentication error, which herdr already reports.
-func runEnsureCert(id, dir string) {
+func runEnsureCert(id, dir string, context ...string) {
 	if dir != "" {
 		_ = os.Setenv("HERDR_PLUGIN_STATE_DIR", dir)
+		name, root := personalAccount, dir
+		if filepath.Base(filepath.Dir(dir)) == "accounts" && accountNamePattern.MatchString(filepath.Base(dir)) {
+			name, root = filepath.Base(dir), filepath.Dir(filepath.Dir(dir))
+		}
+		configDir := accountsConfigRoot()
+		if name != personalAccount {
+			configDir = filepath.Join(configDir, "accounts", name)
+		}
+		if len(context) > 0 && context[0] != "" {
+			configDir = context[0]
+		}
+		if len(context) > 1 && context[1] != "" {
+			name = context[1]
+		}
+		_ = os.Setenv("HERDR_INSTABOX_ROOT_STATE_DIR", root)
+		_ = os.Setenv("HERDR_INSTABOX_ACCOUNT", name)
+		_ = os.Setenv("HERDR_PLUGIN_CONFIG_DIR", configDir)
 	}
-	_, _ = ensureCert(id, false)
+	// The host CLI's selected server/account never retargets a saved SSH host.
+	_ = os.Unsetenv("INSTABOX_SERVER")
+	_ = os.Unsetenv("INSTABOX_API_URL")
+	if _, err := ensureCert(id, false); err != nil {
+		// Match exec failure alone would not stop SSH using an old cached cert.
+		// Remove only this certificate, leaving other accounts and open sessions alone.
+		_ = os.Remove(certPath(id))
+	}
 }

@@ -12,6 +12,8 @@
 package main
 
 import (
+	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -21,6 +23,25 @@ import (
 )
 
 func main() {
+	args := os.Args[1:]
+	explicitAccount := false
+	name := activeAccount()
+	if len(args) > 0 && args[0] == "--account" {
+		if len(args) < 2 {
+			fmt.Fprintln(os.Stderr, "herdr-instabox: --account needs a profile name")
+			os.Exit(2)
+		}
+		name, explicitAccount, args = args[1], true, args[2:]
+	}
+	if !explicitAccount && os.Getenv("HERDR_INSTABOX_ACCOUNT") == "" &&
+		(len(args) == 0 || args[0] == "ui" || args[0] == "open" || args[0] == "new-workspace") {
+		name = selectedAccount()
+	}
+	if err := prepareAccount(name); err != nil {
+		fmt.Fprintln(os.Stderr, "herdr-instabox:", err)
+		os.Exit(1)
+	}
+	os.Args = append([]string{os.Args[0]}, args...)
 	cmd := "ui"
 	if len(os.Args) > 1 {
 		cmd = os.Args[1]
@@ -34,9 +55,36 @@ func main() {
 	var err error
 	switch cmd {
 	case "ui":
-		_, err = tea.NewProgram(newModel(arg(2)), tea.WithAltScreen(), tea.WithMouseCellMotion()).Run()
+		if err = selectAccount(activeAccount()); err != nil {
+			break
+		}
+		var result tea.Model
+		result, err = tea.NewProgram(newModel(arg(2)), tea.WithAltScreen(), tea.WithMouseCellMotion()).Run()
+		if m, ok := result.(model); err == nil && ok && m.nextAccount != "" {
+			err = restartAccountUI(m.nextAccount, tabNames[m.tab])
+		}
+	case "account":
+		err = accountCommand(os.Args[2:])
+	case "whoami":
+		a := whoami()
+		if a.Err != nil {
+			err = a.Err
+		} else {
+			var scope Identity
+			if a.SignedIn() {
+				scope, err = currentIdentity()
+				if err != nil {
+					break
+				}
+			}
+			err = json.NewEncoder(os.Stdout).Encode(map[string]any{"account": activeAccount(), "login": a.Login, "userId": a.UserID, "server": a.Server, "orgId": scope.OrgID, "signedIn": a.SignedIn()})
+		}
+	case "logout":
+		err = errors.Join(cleanupLocal(), signOut())
 	case "open":
-		err = openPane(arg(2))
+		if err = selectAccount(activeAccount()); err == nil {
+			err = openPane(arg(2))
+		}
 	case "new-workspace":
 		err = newWorkspace(arg(2))
 	case "sync":
@@ -45,10 +93,13 @@ func main() {
 		} else {
 			err = syncAll().Err
 		}
+		if !explicitAccount {
+			err = errors.Join(err, syncOtherAccounts(arg(2) == "--if-stale"))
+		}
 	case "job":
 		err = runJob(arg(2))
 	case "ensure-cert":
-		runEnsureCert(arg(2), arg(3))
+		runEnsureCert(arg(2), arg(3), arg(4), arg(5))
 	case "login":
 		err = login(arg(2))
 	case "install-keys":

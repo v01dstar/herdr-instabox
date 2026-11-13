@@ -91,6 +91,13 @@ func saveCredentials(c *Credentials) error {
 	return writeFileAtomic(credentialsPath(), data, 0o600)
 }
 
+func acceptCredentials(c *Credentials) error {
+	if _, err := verifyIdentity(c); err != nil {
+		return err
+	}
+	return saveCredentials(c)
+}
+
 func writeFileAtomic(path string, data []byte, perm os.FileMode) error {
 	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
 		return err
@@ -134,6 +141,9 @@ func accessToken(force bool) (string, error) {
 		return "", errSignedOut
 	}
 	if !force && (c.AccessExpiresAt.IsZero() || time.Now().Add(refreshSkew).Before(c.AccessExpiresAt)) {
+		if _, err := verifyIdentity(c); err != nil {
+			return "", err
+		}
 		return c.AccessToken, nil
 	}
 	stale := c.AccessToken
@@ -148,6 +158,9 @@ func accessToken(force bool) (string, error) {
 		}
 		fresh := c.AccessExpiresAt.IsZero() || time.Now().Add(refreshSkew).Before(c.AccessExpiresAt)
 		if c.AccessToken != stale && fresh {
+			if _, err := verifyIdentity(c); err != nil {
+				return err
+			}
 			tok = c.AccessToken // another process refreshed it
 			return nil
 		}
@@ -165,7 +178,7 @@ func accessToken(force bool) (string, error) {
 			return err
 		}
 		nt.Server = c.Server
-		if err := saveCredentials(&nt); err != nil {
+		if err := acceptCredentials(&nt); err != nil {
 			return err
 		}
 		tok = nt.AccessToken
@@ -217,6 +230,13 @@ func login(provider string) error {
 		provider = "github"
 	}
 	server := serverURL()
+	settings, err := readIdentity(configPath(), true)
+	if err != nil {
+		return err
+	}
+	if settings.Server != "" {
+		server = normalizedIssuer(settings.Server)
+	}
 	var tok *Credentials
 	reason := browserUnavailable()
 	if reason == "" {
@@ -241,7 +261,7 @@ func login(provider string) error {
 		}
 	}
 	tok.Server = server
-	if err := saveCredentials(tok); err != nil {
+	if err := acceptCredentials(tok); err != nil {
 		return err
 	}
 	acct := whoami()

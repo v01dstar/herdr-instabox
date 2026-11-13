@@ -14,12 +14,24 @@ type WorkspaceTarget struct {
 	Cwd   string `json:"cwd"`
 }
 
+// SnapshotProfile keeps credentials scoped to the selected image, never global.
+type SnapshotProfile struct {
+	Secrets  []string          `json:"secrets"`
+	Metadata map[string]string `json:"metadata"`
+}
+
 // Config lets a fork or an unusual deployment point the plugin at a different
 // machine template, snapshot set, Secrets and workspace directories without
 // changing code. It lives in HERDR_PLUGIN_CONFIG_DIR/config.json (Herdr sets
 // that variable for plugin commands) and every field is optional; without it
 // the plugin behaves exactly as before (the herdr template, no Secrets/env).
 type Config struct {
+	// Identity optionally overrides the user/workspace learned from sign-in.
+	Identity Identity `json:"identity"`
+	// SnapshotProfiles is keyed by snapshot ID (UI) or name (default create).
+	SnapshotProfiles map[string]SnapshotProfile `json:"snapshotProfiles"`
+	// DisableVault prevents unrelated personal Vault items reaching these boxes.
+	DisableVault bool `json:"disableVault"`
 	// Templates are InstaBox template ids the plugin manages. "*" matches all.
 	Templates []string `json:"templates"`
 	// SnapshotPrefixes additionally accept snapshots whose names start with one

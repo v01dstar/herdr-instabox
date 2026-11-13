@@ -68,6 +68,7 @@ func authorizedKey(k ssh.PublicKey) string {
 
 // certMeta records an issued certificate.
 type certMeta struct {
+	Identity  Identity  `json:"identity"`
 	Host      string    `json:"host"`
 	Port      int       `json:"port"`
 	Username  string    `json:"username"`
@@ -79,6 +80,15 @@ type certMeta struct {
 // stored one was issued for the current key and is far enough from expiry.
 // force always issues a new one.
 func ensureCert(id string, force bool) (certMeta, error) {
+	scope, err := currentIdentity()
+	if err != nil {
+		return certMeta{}, err
+	}
+	// Check even cached certificates: a scope override must not retain access
+	// to the prior workspace via an already-issued credential.
+	if _, err := getMachine(id); err != nil {
+		return certMeta{}, err
+	}
 	pub, err := ensureKey()
 	if err != nil {
 		return certMeta{}, fmt.Errorf("ssh key: %w", err)
@@ -86,7 +96,7 @@ func ensureCert(id string, force bool) (certMeta, error) {
 	if !force {
 		var m certMeta
 		data, err := os.ReadFile(certMetaPath(id))
-		if err == nil && json.Unmarshal(data, &m) == nil && m.PublicKey == pub &&
+		if err == nil && json.Unmarshal(data, &m) == nil && m.PublicKey == pub && m.Identity == scope &&
 			time.Until(m.ExpiresAt) > certMargin {
 			if _, err := os.Stat(certPath(id)); err == nil {
 				return m, nil
@@ -111,7 +121,7 @@ func ensureCert(id string, force bool) (certMeta, error) {
 	if conn.Certificate == "" || conn.Host == "" || conn.HostTrust.PublicKey == "" {
 		return certMeta{}, errors.New("the server returned an incomplete connection")
 	}
-	m := certMeta{Host: conn.Host, Port: conn.Port, Username: conn.Username, ExpiresAt: conn.ExpiresAt, PublicKey: pub}
+	m := certMeta{Identity: scope, Host: conn.Host, Port: conn.Port, Username: conn.Username, ExpiresAt: conn.ExpiresAt, PublicKey: pub}
 	if m.Username == "" {
 		m.Username = id
 	}

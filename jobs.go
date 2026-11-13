@@ -20,6 +20,7 @@ import (
 // closed becomes a herdr notification.
 
 type Job struct {
+	Identity     *Identity `json:"identity,omitempty"`
 	ID           string    `json:"id"`
 	Kind         string    `json:"kind"`
 	MachineID    string    `json:"machineId,omitempty"`
@@ -116,6 +117,11 @@ func markJobSeen(id string) {
 
 // startJob records the job and launches its detached runner.
 func startJob(j Job) (Job, error) {
+	scope, err := currentIdentity()
+	if err != nil {
+		return j, err
+	}
+	j.Identity = &scope
 	var b [6]byte
 	_, _ = rand.Read(b[:])
 	j.ID = time.Now().Format("20060102-150405") + "-" + hex.EncodeToString(b[:])
@@ -178,6 +184,15 @@ func runJob(id string) error {
 }
 
 func (j *Job) run(progress func(string, ...any)) (string, error) {
+	if j.Identity != nil {
+		scope, err := currentIdentity()
+		if err != nil {
+			return "", err
+		}
+		if scope != *j.Identity {
+			return "", errors.New("job identity/workspace changed; submit it again from the intended account profile")
+		}
+	}
 	name := j.MachineName
 	switch j.Kind {
 	case jobCreate:

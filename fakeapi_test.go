@@ -167,7 +167,26 @@ func (f *fakeAPI) handler() http.Handler {
 		return true
 	})
 	handle("GET /v1/me", true, func(w http.ResponseWriter, r *http.Request, st *fakeInstabox) bool {
-		writeJSON(w, 200, map[string]any{"userId": 42, "login": "tester"})
+		id, org := st.UserID, st.OrgID
+		if id == 0 {
+			id = 42
+		}
+		if org == "" {
+			org = "org_personal"
+		}
+		writeJSON(w, 200, map[string]any{"userId": id, "login": "tester", "org": map[string]string{"id": org}})
+		return false
+	})
+	handle("GET /v1/orgs", true, func(w http.ResponseWriter, r *http.Request, st *fakeInstabox) bool {
+		org := st.OrgID
+		if org == "" {
+			org = "org_personal"
+		}
+		rows := []map[string]string{{"id": org}}
+		for _, id := range st.Orgs {
+			rows = append(rows, map[string]string{"id": id})
+		}
+		writeJSON(w, 200, map[string]any{"orgs": rows})
 		return false
 	})
 	handle("GET /v1/templates", true, func(w http.ResponseWriter, r *http.Request, st *fakeInstabox) bool {
@@ -188,6 +207,9 @@ func (f *fakeAPI) handler() http.Handler {
 		var in map[string]string
 		_ = json.NewDecoder(r.Body).Decode(&in)
 		m := newMachine(st, in["name"])
+		if in["orgId"] != "" {
+			m["orgId"] = in["orgId"]
+		}
 		if in["snapshotId"] != "" {
 			m["snapshot"] = map[string]any{"id": in["snapshotId"]}
 		}
@@ -243,6 +265,7 @@ func (f *fakeAPI) handler() http.Handler {
 			var in map[string]string
 			_ = json.NewDecoder(r.Body).Decode(&in)
 			sn := map[string]any{"id": fmt.Sprintf("sn_fake%d", len(st.Snapshots)+1), "name": in["name"],
+				"orgId":       m["orgId"],
 				"description": in["description"], "sourceMachineId": id, "rootSizeBytes": 1 << 34,
 				"dataSizeBytes": 1 << 33, "exclusiveBytes": 1 << 20, "template": m["template"],
 				"createdAt": "2026-10-05T01:00:00Z"}

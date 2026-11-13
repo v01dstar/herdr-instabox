@@ -23,6 +23,9 @@ type fakeEnv struct {
 }
 
 type fakeInstabox struct {
+	UserID    int64            `json:"userId,omitempty"`
+	OrgID     string           `json:"orgId,omitempty"`
+	Orgs      []string         `json:"orgs,omitempty"`
 	SignedIn  bool             `json:"signedIn"`
 	Machines  []map[string]any `json:"machines"`
 	Snapshots []map[string]any `json:"snapshots"`
@@ -49,6 +52,10 @@ func newFake(t *testing.T, machines ...map[string]any) *fakeEnv {
 	t.Setenv("HOME", home)
 	t.Setenv("HERDR_BIN_PATH", filepath.Join(fake, "herdr"))
 	t.Setenv("HERDR_PLUGIN_STATE_DIR", filepath.Join(dir, "state"))
+	t.Setenv("HERDR_INSTABOX_ACCOUNT", personalAccount)
+	t.Setenv("HERDR_INSTABOX_ROOT_STATE_DIR", filepath.Join(dir, "state"))
+	t.Setenv("HERDR_INSTABOX_ROOT_CONFIG_DIR", filepath.Join(home, ".config/herdr/plugins/config/v01dstar.instabox"))
+	t.Setenv("HERDR_PLUGIN_CONFIG_DIR", filepath.Join(home, ".config/herdr/plugins/config/v01dstar.instabox"))
 	t.Setenv("FAKE_ADD_FAILS", "")
 	t.Setenv("FAKE_ADD_DELAY", "")
 	f := &fakeEnv{t: t, dir: dir, home: home}
@@ -66,6 +73,7 @@ func newFake(t *testing.T, machines ...map[string]any) *fakeEnv {
 func fakeMachine(id, name, state string) map[string]any {
 	return map[string]any{
 		"id": id, "name": name, "state": state,
+		"orgId":    "org_personal",
 		"template": map[string]any{"id": "herdr", "version": "2026-10-05.1"},
 		"spec":     map[string]any{"vcpus": 4, "memMiB": 8192, "persistentDiskGiB": 20},
 		"storage":  map[string]any{"synced": true},
@@ -100,7 +108,14 @@ func (f *fakeEnv) instabox() fakeInstabox {
 	return h
 }
 
-func (f *fakeEnv) writeInstabox(h fakeInstabox) { f.writeJSON("instabox.json", h) }
+func (f *fakeEnv) writeInstabox(h fakeInstabox) {
+	for _, snapshot := range h.Snapshots {
+		if _, ok := snapshot["orgId"]; !ok {
+			snapshot["orgId"] = "org_personal"
+		}
+	}
+	f.writeJSON("instabox.json", h)
+}
 
 func (f *fakeEnv) herdr() fakeHerdr {
 	var h fakeHerdr
@@ -647,19 +662,25 @@ func TestInstallKeysAddsOnceAndKeepsUserKeys(t *testing.T) {
 
 func TestSignInOnARetiredServerMoves(t *testing.T) {
 	f := newFake(t, fakeMachine("m_a", "alpha", "running"))
+	// Authenticated calls now stay bound to the saved issuer, not an ambient
+	// server override. Keep the migration entirely inside the fake server.
+	retired := "https://api.box.instacloud.com"
+	previous := movedServers[retired]
+	movedServers[retired] = f.server
+	t.Cleanup(func() { movedServers[retired] = previous })
 	f.sync()
 	c, _ := loadCredentials()
 	c.Server = "https://api.box.instacloud.com"
 	if err := saveCredentials(c); err != nil {
 		t.Fatal(err)
 	}
-	if got, _ := loadCredentials(); got.Server != defaultServerURL || got.RefreshToken != "rt" {
-		t.Fatalf("moved to %q keeping the sign-in, got %+v", defaultServerURL, got)
+	if got, _ := loadCredentials(); got.Server != f.server || got.RefreshToken != "rt" {
+		t.Fatalf("moved to %q keeping the sign-in, got %+v", f.server, got)
 	}
 	if hasHostBlock("m_a") {
 		t.Fatal("the old gateway's Host block is dropped")
 	}
-	if saved, _ := os.ReadFile(credentialsPath()); !strings.Contains(string(saved), defaultServerURL) {
+	if saved, _ := os.ReadFile(credentialsPath()); !strings.Contains(string(saved), f.server) {
 		t.Fatalf("the move is saved: %s", saved)
 	}
 	f.sync() // INSTABOX_SERVER still points at the fake API

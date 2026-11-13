@@ -1,0 +1,7 @@
+{
+  "templates": ["herdr"],
+  "secrets": ["PERSONAL_MODEL_KEY"],
+  "disableVault": true,
+  "metadata": { "credentialProfile": "personal" },
+  "defaultCwd": "/data/workspace/personal-app"
+}

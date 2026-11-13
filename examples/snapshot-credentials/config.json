@@ -1,0 +1,18 @@
+{
+  "templates": ["herdr"],
+  "snapshotPrefixes": ["work-", "generic-"],
+  "disableVault": true,
+  "secrets": ["DEFAULT_MODEL_KEY"],
+  "snapshotProfiles": {
+    "work-ready": {
+      "secrets": ["WORK_MODEL_KEY", "WORK_GH_TOKEN"],
+      "metadata": { "credentialProfile": "work" }
+    },
+    "snap_REPLACE_WITH_WORK_ID": {
+      "secrets": ["WORK_MODEL_KEY", "WORK_GH_TOKEN"],
+      "metadata": { "credentialProfile": "work" }
+    },
+    "generic-clean": { "secrets": [] },
+    "snap_REPLACE_WITH_GENERIC_ID": { "secrets": [] }
+  }
+}

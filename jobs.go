@@ -94,7 +94,7 @@ func listJobs() []Job {
 			continue
 		}
 		if j.Status == "running" && !processAlive(j.PID) && time.Since(j.Updated) > 5*time.Second {
-			j.Status, j.Result = "failed", "The operation stopped unexpectedly."
+			j.Status, j.Result = "failed", "The operation stopped unexpectedly. Refresh this profile's machines/snapshots before retrying; the cloud operation may have completed."
 			_ = j.save()
 		}
 		if j.Status != "running" && time.Since(j.Updated) > 24*time.Hour {
@@ -143,7 +143,7 @@ func startJob(j Job) (Job, error) {
 	cmd.Stdout, cmd.Stderr = log, log
 	detach(cmd)
 	if err := cmd.Start(); err != nil {
-		j.Status, j.Result = "failed", err.Error()
+		j.Status, j.Result = "failed", fmt.Sprintf("Profile %s: %v", activeAccount(), err)
 		_ = j.save()
 		return j, err
 	}
@@ -173,9 +173,9 @@ func runJob(id string) error {
 	}
 	j.Progress = ""
 	if !uiAlive() {
-		title := "instabox"
+		title := "instabox: " + activeAccount()
 		if j.Status == "failed" {
-			title = "instabox: operation failed"
+			title += ": operation failed"
 		}
 		notify(title, j.Result)
 		j.Seen = true
@@ -184,6 +184,9 @@ func runJob(id string) error {
 }
 
 func (j *Job) run(progress func(string, ...any)) (string, error) {
+	if _, err := readConfig(configPath()); err != nil {
+		return "", err
+	}
 	if j.Identity != nil {
 		scope, err := currentIdentity()
 		if err != nil {

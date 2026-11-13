@@ -207,7 +207,11 @@ func whoami() Account {
 	case err != nil:
 		return Account{Err: err, Server: c.Server}
 	}
-	return Account{Login: me.Login, UserID: strconv.FormatInt(me.UserID, 10), Server: c.Server}
+	scope, err := currentIdentity()
+	if err != nil {
+		return Account{Err: err, Server: c.Server}
+	}
+	return Account{Login: me.Login, UserID: strconv.FormatInt(me.UserID, 10), Server: c.Server, OrgID: scope.OrgID}
 }
 
 // signOut revokes the sign-in on the server (best effort) and forgets it.
@@ -228,6 +232,9 @@ func signOut() error {
 func login(provider string) error {
 	if provider == "" {
 		provider = "github"
+	}
+	if provider != "github" && provider != "google" {
+		return fmt.Errorf("unknown login provider; choose github or google")
 	}
 	server := serverURL()
 	settings, err := readIdentity(configPath(), true)
@@ -268,7 +275,11 @@ func login(provider string) error {
 	if !acct.SignedIn() {
 		return fmt.Errorf("signed in, but the account could not be checked: %v", acct.Err)
 	}
-	fmt.Printf("Signed in to %s as %s.\n", server, acct.Login)
+	scope, err := currentIdentity()
+	if err != nil {
+		return err
+	}
+	fmt.Printf("Profile %s: signed in to %s as %s (workspace %s).\n", activeAccount(), server, acct.Login, scope.OrgID)
 	return nil
 }
 

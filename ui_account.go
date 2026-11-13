@@ -13,7 +13,8 @@ const accountNote = "Use [ / ] to select an account profile. Each keeps its own 
 func (m model) accountActions() []action {
 	if m.acct.SignedIn() || (m.acct.Err != nil && !m.acct.SignedOut) {
 		return []action{
-			{kind: aSwitch, label: "Sign in again…"},
+			{kind: aSwitch, label: "Sign in again with GitHub…"},
+			{kind: aSignInGoogle, label: "Sign in again with Google…"},
 			{kind: aSignOut, label: "Sign out…"},
 			{kind: aAddAccount, label: "Add another account…"},
 		}
@@ -30,7 +31,7 @@ func (m model) accountSummary() string {
 	case !m.checked:
 		return "Checking your instabox sign-in…"
 	case m.acct.SignedIn():
-		return fmt.Sprintf("Profile %s: signed in as @%s on %s.", activeAccount(), m.acct.Login, m.acct.Server)
+		return fmt.Sprintf("Profile %s: @%s · workspace %s · %s.", activeAccount(), m.acct.Login, m.acct.OrgID, m.acct.Server)
 	case m.acct.SignedOut:
 		return fmt.Sprintf("Profile %s: not signed in to instabox (%s).", activeAccount(), m.acct.Server)
 	}
@@ -111,7 +112,7 @@ func (m model) runAccountAction() (tea.Model, tea.Cmd) {
 }
 
 // signIn hands the terminal to `herdr-instabox login`, which opens the browser
-// or shows a device code. Switching accounts first clears the old account's machines.
+// or shows a device code. Setup offers a safe config only when none exists.
 func (m model) signIn(provider string) (tea.Model, tea.Cmd) {
 	// Keep existing connections intact until the candidate login has passed
 	// this profile's identity check; a wrong-account browser choice is harmless.
@@ -121,7 +122,7 @@ func (m model) signIn(provider string) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 	m.say(msgInfo, "Starting sign-in…")
-	return m, interactive(self, []string{"login", provider}, func() (string, error) {
+	return m, interactive(self, []string{"setup", provider}, func() (string, error) {
 		acct := whoami()
 		if !acct.SignedIn() {
 			return "", fmt.Errorf("sign-in did not complete")

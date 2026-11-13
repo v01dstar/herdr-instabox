@@ -1,0 +1,15 @@
+{
+  "templates": ["agent-browser", "herdr"],
+  "snapshotPrefixes": ["team-"],
+  "metadata": { "purpose": "team-development", "herdr": "true" },
+  "secrets": [],
+  "disableVault": true,
+  "env": { "APP_ENV": "development" },
+  "defaultTemplate": "agent-browser",
+  "defaultSnapshot": "team-ready",
+  "defaultCwd": "/data/workspace/api",
+  "workspaces": [
+    { "id": "api", "title": "API", "cwd": "/data/workspace/api" },
+    { "id": "web", "title": "Web", "cwd": "/data/workspace/web" }
+  ]
+}

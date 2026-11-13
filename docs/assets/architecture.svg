@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="380" viewBox="0 0 960 380" role="img" aria-labelledby="title desc">
+  <title id="title">Two accounts. One local control room.</title>
+  <desc id="desc">Herdr displays personal and work cloud machines. Each plugin profile owns separate credentials, workspace binding, configuration, SSH keys and certificates. Connections use the InstaBox API and SSH, not local checkout synchronization.</desc>
+  <rect width="960" height="380" rx="20" fill="#101827"/>
+  <g font-family="system-ui,sans-serif">
+    <text x="36" y="48" fill="#f1f5f9" font-size="25" font-weight="700">Two accounts. One local control room.</text>
+    <text x="36" y="77" fill="#b5c4d6" font-size="15">Persistent remote workspaces · reusable snapshots · independent sign-ins</text>
+    <rect x="36" y="124" width="192" height="174" rx="12" fill="#1e293b" stroke="#52647d"/>
+    <text x="60" y="160" fill="#f1f5f9" font-size="20" font-weight="700">Herdr</text>
+    <text x="60" y="191" fill="#b5c4d6" font-size="15">Settings + sidebar</text>
+    <text x="60" y="217" fill="#b5c4d6" font-size="15">Saved SSH machines</text>
+    <text x="60" y="269" fill="#b5c4d6" font-size="13">Your local machine</text>
+    <path d="M228 210H267V167H300M267 210V272H300M588 167H650M588 272H650" fill="none" stroke="#94a3b8" stroke-width="2"/>
+    <rect x="300" y="119" width="288" height="96" rx="12" fill="#153532" stroke="#76e6a3"/>
+    <text x="320" y="149" fill="#76e6a3" font-size="19" font-weight="700">personal</text>
+    <text x="320" y="175" fill="#e2e8f0" font-size="14">Own login · workspace · config</text>
+    <text x="320" y="196" fill="#e2e8f0" font-size="14">Own SSH key + certificates</text>
+    <rect x="300" y="226" width="288" height="96" rx="12" fill="#162f48" stroke="#6db8ff"/>
+    <text x="320" y="256" fill="#6db8ff" font-size="19" font-weight="700">work</text>
+    <text x="320" y="282" fill="#e2e8f0" font-size="14">Own login · workspace · config</text>
+    <text x="320" y="303" fill="#e2e8f0" font-size="14">Own SSH key + certificates</text>
+    <rect x="650" y="119" width="274" height="96" rx="12" fill="#1e293b" stroke="#76e6a3"/>
+    <text x="672" y="153" fill="#f1f5f9" font-size="18">Personal machines</text>
+    <text x="672" y="184" fill="#b5c4d6" font-size="14">InstaBox API + SSH</text>
+    <rect x="650" y="226" width="274" height="96" rx="12" fill="#1e293b" stroke="#6db8ff"/>
+    <text x="672" y="260" fill="#f1f5f9" font-size="18">Work machines</text>
+    <text x="672" y="291" fill="#b5c4d6" font-size="14">InstaBox API + SSH</text>
+    <text x="36" y="354" fill="#b5c4d6" font-size="14">Selecting another profile leaves existing connections running. No automatic local-file mirroring.</text>
+  </g>
+</svg>

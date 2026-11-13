@@ -62,7 +62,8 @@ func TestAccountSyncRenewalAndSignOutAreIsolated(t *testing.T) {
 	if err := prepareAccount("work"); err != nil {
 		t.Fatal(err)
 	}
-	if loadConfig().DefaultSnapshot != "" {
+	cfg, err := readConfig(configPath())
+	if err != nil || cfg.DefaultSnapshot != "" {
 		t.Fatal("another account's snapshot config leaked")
 	}
 	if err := saveCredentials(&Credentials{Server: w.server, AccessToken: "work-at", AccessExpiresAt: time.Now().Add(-time.Minute), RefreshToken: "work-rt"}); err != nil {

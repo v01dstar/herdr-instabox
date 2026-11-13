@@ -195,6 +195,10 @@ func runEnsureCert(id, dir string, context ...string) {
 	// The host CLI's selected server/account never retargets a saved SSH host.
 	_ = os.Unsetenv("INSTABOX_SERVER")
 	_ = os.Unsetenv("INSTABOX_API_URL")
+	if _, err := readConfig(configPath()); err != nil {
+		_ = os.Remove(certPath(id))
+		return
+	}
 	if _, err := ensureCert(id, false); err != nil {
 		// Match exec failure alone would not stop SSH using an old cached cert.
 		// Remove only this certificate, leaving other accounts and open sessions alone.

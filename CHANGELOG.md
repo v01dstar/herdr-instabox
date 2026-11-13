@@ -1,5 +1,30 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- Guided `setup [github|google]`, also used by settings sign-in, offering a
+  private no-Secrets/Vault-disabled starter config without replacing existing files.
+- `--help` and read-only `doctor [--json]` for account-local diagnostics without
+  network calls, token refreshes, state migration, repairs, or cloud changes.
+- Herdr `setup` and `doctor` actions, and explicit GitHub/Google re-login choices.
+- Account/workspace and Secret-name/Vault summaries before UI machine creation;
+  profile labels in confirmations, login results, and job notifications.
+- Reworked README, architecture illustration, five usage recipes, authentication,
+  configuration, recovery, security, contribution and live verification guides.
+- Linux/macOS CI, strict example-config tests, and offline Markdown/link checks.
+
+### Changed
+
+- Configuration errors, unknown keys, and unreadable configured env files now fail
+  explicitly instead of silently reverting to defaults. Create/list operations
+  recheck config during a running session. Help, diagnostics, account management,
+  key installation, and logout remain available for recovery.
+- Unknown login providers are rejected before launching an authentication flow.
+- Interrupted job messages advise inspecting remote state before retrying.
+- Install instructions target this fork while preserving upstream identifiers.
+
 ## 0.5.1 — 2026-11-13
 
 ### Added

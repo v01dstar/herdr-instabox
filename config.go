@@ -1,7 +1,11 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
+	"fmt"
+	"io"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -66,10 +70,32 @@ func configPath() string {
 	return filepath.Join(home, ".config", "herdr", "plugins", "config", "v01dstar.instabox", "config.json")
 }
 
-func loadConfig() Config {
+// readConfig rejects mistakes before defaults or credential selections are used.
+// Missing configuration is valid; an existing file must contain one JSON object.
+func readConfig(path string) (Config, error) {
 	var c Config
-	if data, err := os.ReadFile(configPath()); err == nil {
-		_ = json.Unmarshal(data, &c)
+	data, err := os.ReadFile(path)
+	if err != nil && !os.IsNotExist(err) {
+		return c, fmt.Errorf("read config %s: %w", path, err)
+	}
+	if err == nil {
+		if len(bytes.TrimSpace(data)) == 0 || bytes.TrimSpace(data)[0] != '{' {
+			return c, fmt.Errorf("config %s must contain a JSON object", path)
+		}
+		decoder := json.NewDecoder(bytes.NewReader(data))
+		decoder.DisallowUnknownFields()
+		if err := decoder.Decode(&c); err != nil {
+			return Config{}, fmt.Errorf("invalid config %s: %w", path, err)
+		}
+		if err := decoder.Decode(new(any)); err != io.EOF {
+			return Config{}, fmt.Errorf("config %s must contain exactly one JSON object", path)
+		}
+	}
+	if c.Identity.Server != "" {
+		u, err := url.Parse(c.Identity.Server)
+		if err != nil || u.Host == "" || (u.Scheme != "https" && u.Scheme != "http") || u.User != nil || u.RawQuery != "" || u.Fragment != "" {
+			return Config{}, fmt.Errorf("config %s: identity.server must be an HTTP(S) issuer URL without credentials, query or fragment", path)
+		}
 	}
 	if len(c.Templates) == 0 {
 		c.Templates = []string{HerdrTemplate}
@@ -81,7 +107,11 @@ func loadConfig() Config {
 		c.Env = map[string]string{}
 	}
 	if c.EnvFile != "" {
-		for k, v := range parseEnvFile(c.EnvFile) {
+		values, err := readEnvFile(c.EnvFile)
+		if err != nil {
+			return Config{}, fmt.Errorf("config %s: envFile cannot be read: %w", path, err)
+		}
+		for k, v := range values {
 			if _, ok := c.Env[k]; !ok {
 				c.Env[k] = v
 			}
@@ -90,14 +120,14 @@ func loadConfig() Config {
 	if c.DefaultCwd == "" && len(c.Workspaces) > 0 {
 		c.DefaultCwd = c.Workspaces[0].Cwd
 	}
-	return c
+	return c, nil
 }
 
-func parseEnvFile(path string) map[string]string {
+func readEnvFile(path string) (map[string]string, error) {
 	out := map[string]string{}
 	data, err := os.ReadFile(path)
 	if err != nil {
-		return out
+		return out, err
 	}
 	for _, line := range strings.Split(string(data), "\n") {
 		line = strings.TrimSpace(line)
@@ -121,7 +151,7 @@ func parseEnvFile(path string) map[string]string {
 		}
 		out[k] = v
 	}
-	return out
+	return out, nil
 }
 
 // matchesMachine reports whether a machine belongs to this plugin's fleet.

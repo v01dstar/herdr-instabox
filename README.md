@@ -1,255 +1,148 @@
-# herdr-instabox
+# InstaBox for Herdr
 
-A herdr plugin for instabox cloud machines. Sign in, create, start, suspend, stop,
-copy and delete machines from a settings pane modelled on herdr's own
-Settings → remotes / snapshots / account; running machines appear in herdr's
-sidebar on their own, like any saved SSH machine. herdr itself is unmodified.
+**Your cloud development machines, right in Herdr’s sidebar. Personal and work accounts connected together.**
 
-It talks to the instabox API (`https://api.instabox.sh`, or
-`INSTABOX_SERVER`) directly and drives the `herdr` CLI (saved machines,
-workspaces, notifications). The instabox CLI is not needed; the plugin has its
-own sign-in, separate from the CLI's. Linux and macOS.
+[![CI](https://github.com/mdp/herdr-instabox/actions/workflows/ci.yml/badge.svg)](https://github.com/mdp/herdr-instabox/actions/workflows/ci.yml)
+[![Herdr ≥0.9.0](https://img.shields.io/badge/Herdr-%E2%89%A50.9.0-6db8ff)](https://herdr.dev)
+![Linux and macOS](https://img.shields.io/badge/platform-Linux%20%7C%20macOS-76e6a3)
 
-See [CHANGELOG.md](CHANGELOG.md) for release notes.
+Create a machine, reconnect to a persistent workspace, or turn a prepared environment into a snapshot—without leaving [Herdr](https://herdr.dev). Sign in to [InstaBox](https://instabox.sh) with GitHub or Google. No InstaBox CLI required.
 
-## Install
+![Architecture: Herdr manages independent personal and work profiles, each connecting to its own cloud machines through the InstaBox API and SSH.](docs/assets/architecture.svg)
 
-```bash
-herdr plugin link .                      # from a checkout (run `go build -o bin/herdr-instabox .` first)
-herdr plugin install v01dstar/herdr-instabox   # needs Go to build
-```
+[Quick start](#quick-start) · [Multiple accounts](#personal--work-without-switching-logins) · [Examples](examples/README.md) · [Configuration](docs/configuration.md) · [Troubleshooting](docs/troubleshooting.md)
 
-Open it with the `instabox settings` action, or with the keys that installing
-adds to herdr's `config.toml`: `prefix+m` for instabox settings and
-`prefix+shift+m` for a new workspace on the default machine. A key or action
-you have already bound is left alone, and removing the bindings is up to you.
-`herdr plugin link` runs no build, so after linking run
-`bin/herdr-instabox install-keys` yourself. To bind other keys, edit the config;
-pick keys herdr does not already use, because a custom binding that conflicts
-with a built-in one is disabled.
+## Why use it?
 
-```toml
-[[keys.command]]
-key = "prefix+m"
-type = "plugin_action"
-command = "v01dstar.instabox.open"
-description = "instabox settings"
+- **Native remotes.** Running machines appear as saved SSH machines in Herdr’s sidebar.
+- **Personal + work, together.** Each profile owns its login, workspace binding, SSH key, certificates, defaults, and Secret selection. Selecting one leaves the others connected.
+- **Reusable environments.** Copy a machine or save a snapshot, then create another machine from it.
+- **Credentials chosen for the job.** Select InstaBox Secrets per account and override them per snapshot—including an empty selection.
+- **Operations survive the pane.** Create, start, suspend, stop, copy, and delete run in the background, with notifications when finished.
+- **Automatic SSH certificates.** The plugin manages its own key and renews short-lived certificates before connections.
 
-[[keys.command]]
-key = "prefix+shift+m"
-type = "plugin_action"
-command = "v01dstar.instabox.new-workspace"
-description = "new workspace on the default machine"
-```
+> **Mental model:** this is a persistent **remote-machine manager**, not a local-file mirroring tool. Your code lives on the machine where you open the workspace. The plugin does not upload your local checkout, copy host agent credentials, or automatically bring edits back.
 
-## What it does
+## Quick start
 
-- **remotes**: Local, your instabox machines and your own SSH remotes, each with
-  its actions: Start / Resume / Suspend… / Stop…, Test connection, Edit… (a
-  herdr-only name), Use as default, Hide from / Show in sidebar, Copy machine…
-  (clone now, or save as snapshot), Delete machine…. `+ Add remote` creates a
-  machine from the herdr template or one of your snapshots, or adds an SSH remote.
-- **snapshots**: your snapshots of herdr machines (snapshots of machines on other
-  instabox templates are not listed); New machine from snapshot…, Delete snapshot….
-- **account**: Add another account profile, sign in with GitHub or Google
-  (browser, or a GitHub device code without one), sign out of just this profile,
-  and view its storage/machine/snapshot usage. Press **`[` / `]`** to select a
-  profile without disconnecting the others.
-- **New workspace** opens a workspace on the default machine (Local unless you
-  chose another with Use as default). It never starts a machine.
+### 1. Install
 
-Long operations (create, start, stop, copy, delete) run as background processes:
-closing the pane does not interrupt them, and a result that arrives while the
-pane is closed shows as a herdr notification.
-
-## How machines get into herdr
-
-The plugin reconciles herdr's saved machines with instabox when herdr starts, at
-most once a minute as you switch workspaces, and every 15 seconds while the
-pane is open:
-
-| instabox machine | herdr |
-|---|---|
-| running | saved (`herdr machine add`, which starts its `herdr-remote` session) and enabled |
-| stopped, suspended, starting… | disabled (it stays in the sidebar) |
-| hidden | removed from herdr, still listed in the pane |
-| deleted | removed, with its SSH config and plugin state |
-
-A machine that has not been running since you signed in cannot be saved yet
-(herdr checks the remote when it saves one), so it appears once it runs.
-
-SSH: each machine gets a Host block `herdr-instabox-<machine id>` in the plugin's
-state directory, pulled in by one `Include` line that signing in adds to the top
-of `~/.ssh/config` (a backup is kept as `~/.ssh/config.herdr-instabox.bak`). The
-plugin connects with its own SSH key and 24-hour certificates the API issues
-for it; a `Match exec` in front of each block renews the certificate before a
-connection when less than 10 minutes are left. The gateway checks a
-certificate only when a connection opens, so an open connection outlives it.
-
-Signing out revokes this account profile's sign-in and removes its local traces: the herdr
-machines, the Host blocks, the SSH key and certificates, and the `Include` line. The machines keep running on instabox, and their herdr-only
-names, hidden state and the default are kept for the next sign-in.
-
-## Multiple accounts
-
-Personal and work accounts can stay signed in and connected at the same time.
-In the **account** tab choose **Add another account…**, give it a name such as
-`work`, then press `]` to select it and sign in. The badge identifies the profile
-and actual login. `[` / `]` moves between profiles; the last UI selection is
-remembered, including for the New workspace action.
-
-The original sign-in is the **`personal`** profile. Its files and SSH aliases
-are not moved or rewritten during upgrade. Named profiles have their own:
-
-- Credentials and refresh lock, stored under `STATE/accounts/<name>/`.
-- SSH private key, host trust, certificates, renewal and Include block.
-- Jobs, machine labels, hidden state, default workspace target and sync timers.
-- `CONFIG/accounts/<name>/config.json`, including snapshot/Secret selections.
-  This file starts absent: personal Secrets/env/snapshot defaults are **not**
-  inherited into work. Configure it before creating work boxes through the UI.
-
-Names use 1–32 lowercase letters/digits/`_`/`-`, starting with a letter. The
-state/config roots are Herdr's `HERDR_PLUGIN_STATE_DIR` and
-`HERDR_PLUGIN_CONFIG_DIR`. Account directories are private (0700); credentials,
-keys and state files are private (0600). No CLI login tokens are imported.
-
-CLI equivalents, from a plugin environment (outside Herdr, set the state/config
-roots to the installed plugin's directories first):
+You need **Herdr 0.9.0+**, **Go 1.27.1+** to build, OpenSSH (`ssh` and `ssh-keygen`), and Linux or macOS. You also need an InstaBox account with access to the intended workspace.
 
 ```bash
-bin/herdr-instabox account list
+herdr plugin install mdp/herdr-instabox
+```
+
+This is the multi-account fork of [v01dstar/herdr-instabox](https://github.com/v01dstar/herdr-instabox). The plugin ID remains **`v01dstar.instabox`** to preserve existing installations. Do not install both copies side by side; back up your config/state before replacing an existing installation.
+
+For a local checkout:
+
+```bash
+git clone https://github.com/mdp/herdr-instabox.git
+cd herdr-instabox
+go build -o bin/herdr-instabox .
+herdr plugin link "$PWD"
+bin/herdr-instabox install-keys
+```
+
+Linking does not run build steps. Installation adds missing default keybindings; existing bindings are left alone.
+
+### 2. Sign in
+
+With **Local** selected in Herdr’s sidebar, press **`prefix+m`** to open InstaBox settings. Open **account** and choose **Sign in with GitHub** or **Sign in with Google**.
+
+On first setup, you can create a private starter config with no selected Secrets and Vault delivery disabled. Existing config is never replaced. GitHub uses a device code when a browser is unavailable; Google needs a local browser.
+
+### 3. Create a machine and work
+
+1. In **remotes**, choose **+ Add remote**, name the machine, and create it from the default template or a snapshot.
+2. Wait for it to run and appear in Herdr’s sidebar.
+3. Select the machine in the sidebar and open a workspace. Clone your repository on the remote machine if needed.
+4. To use the shortcut, return to **Local**, open settings, choose **Use as default** for that machine, then press **`prefix+shift+m`**.
+
+The shortcut creates a workspace on the selected profile’s default; it **does not start a stopped machine**. After creating a remote workspace, select it in the sidebar—plugins cannot switch the client for you.
+
+`prefix` is your configured Herdr prefix. Plugin keybindings currently work only while **Local** is selected.
+
+## Personal + work without switching logins
+
+Your original sign-in is the **`personal`** profile. To add work:
+
+1. Open **account → Add another account…**, enter `work`.
+2. Press **`]`** to select it, then sign in with the intended work login.
+3. Configure work’s Secrets/snapshots separately before creating machines. Personal configuration is **not inherited**.
+4. Use **`[` / `]`** to move between profiles. Both sets of machines stay connected.
+
+The profile name is a local label, not an OAuth provider or an InstaBox workspace. First sign-in binds it to the verified user and default workspace; a later wrong-account browser login cannot silently replace that identity.
+
+From a checkout, **in the installed plugin environment**:
+
+```bash
 bin/herdr-instabox account add work
-bin/herdr-instabox --account work login google
+bin/herdr-instabox --account work setup google
 bin/herdr-instabox --account work whoami
 bin/herdr-instabox --account work sync
-bin/herdr-instabox --account work ui
-bin/herdr-instabox --account work logout
+bin/herdr-instabox --account work logout  # only work; cloud machines keep running
 ```
 
-The unqualified startup/event `sync` reconciles **all** accounts; an explicit
-`--account NAME sync` limits it to that account. A profile can only manage its
-own namespaced Herdr SSH targets. Syncing, deleting, or signing out cannot
-remove another profile's machines, keys or certificates. Shared Herdr/SSH config
-writes are serialized across profiles. Selecting another UI profile restarts
-the UI process instead of swapping credentials underneath pending requests.
+Outside Herdr, first set the installed plugin’s root state/config paths. See [authentication](docs/authentication.md) for exact environment rules and [the two-account recipe](examples/multiple-accounts/README.md) for a complete walkthrough.
 
-Certificate renewal uses the credentials alongside the SSH host block, not the
-CLI's active account. Authenticated API calls stay with the issuer saved in that
-profile, regardless of an ambient CLI server override. No CLI account switching
-is needed once both plugin profiles have their own sign-ins.
+## Everyday controls
 
-**Migrating a manual SSH workaround:** sign into the new plugin profile first
-and verify the managed connection reaches the same box and remote session. Only
-then remove the old manual Herdr profile/SSH helper; do not stop the box or its
-sessions. The plugin does not silently adopt or delete ordinary SSH profiles.
+| Where | What you can do |
+| --- | --- |
+| **remotes** | Start/resume, suspend, stop, test, rename locally, choose default, hide/show, copy, delete, add SSH remotes |
+| **snapshots** | Create a machine from a snapshot; delete a snapshot |
+| **account** | Sign in, add/select profiles, sign out of one profile, inspect usage |
+| `prefix+m` | Open settings from Local |
+| `prefix+shift+m` | New workspace on the selected profile’s default |
 
-### Default identity and optional overrides
+The plugin reconciles all accounts at Herdr startup and at most once a minute on workspace events. The open settings pane refreshes its profile every 15 seconds. Running machines are enabled; stopped/suspended machines already registered remain disabled in the sidebar. A machine never seen running cannot be registered until it runs.
 
-No IDs need to be configured by default. On first use, each profile verifies its
-**own signed-in IBX user and default workspace** and records that non-secret
-binding in `identity.json` alongside its state (0600). Existing sign-ins migrate
-automatically. Later sign-ins and token refreshes must match, preventing a wrong
-browser account from silently taking over a profile. This does not follow the
-standalone CLI's login or the sandbox's Linux username.
+## Learn by example
 
-Override only the fields you need in that profile's `config.json`:
+| Recipe | You’ll learn |
+| --- | --- |
+| [Minimal](examples/minimal/README.md) | A safe starter configuration |
+| [Personal + work](examples/multiple-accounts/README.md) | Two providers, independent config, scoped verification and logout |
+| [Snapshot credentials](examples/snapshot-credentials/README.md) | Select or explicitly omit Secrets for each image |
+| [Custom workspaces](examples/workspaces/README.md) | Templates, snapshot selection, and repository paths |
+| [Reusable dev machine](examples/dev-machine/README.md) | Prepare once, snapshot, create a second machine, clean up |
 
-```json
-{
-  "identity": {
-    "userId": "-63427",
-    "orgId": "org_8f3f687fdd824693ba9126ce9924b1ba"
-  }
-}
+## Diagnostics and trust
+
+```bash
+bin/herdr-instabox --help
+bin/herdr-instabox --account work doctor
+bin/herdr-instabox --account work doctor --json
 ```
 
-`server` may also be specified when using a different IBX issuer. User IDs are
-strings. An alternate user requires signing in as that actual user; an alternate
-workspace must be accessible to the signed-in user. Overrides do **not** grant
-permissions. Omitting fields uses the automatic binding; removing an override
-restores it. The original binding stays in place across sign-out.
+`doctor` only reads local files and checks executable availability. It does not contact the API, refresh tokens, repair SSH, or create machines. `whoami` verifies the effective identity online. Diagnostic output contains local paths; review before sharing.
 
-Machines and snapshots are filtered to the effective workspace. Creates send
-its `orgId` explicitly, while machine actions/exec, snapshot actions and SSH
-certificate issuance reject out-of-scope targets. Background jobs record their
-identity/workspace and fail if that changes before execution. SSH renewal carries
-the profile's config as well as its credentials; a failed identity/scope check
-cannot reuse an old cached certificate. Existing open SSH sessions are not killed.
+Account separation prevents accidental credential mixing, not access by other processes running as your OS user. Secrets intentionally delivered to a cloud machine are accessible there. Signing out removes this profile’s local connections and revokes its sign-in; **it does not stop billable cloud machines**. See [security](SECURITY.md) and [lifecycle details](docs/design.md).
 
-`--account NAME whoami` reports the effective workspace. Malformed identity
-settings fail closed. These checks prevent accidental account mixing, not
-malicious access by another process running under the same host OS user; IBX
-server permissions remain the actual authorization boundary.
+## Documentation
 
-## Differences from built-in support
-
-Things a plugin cannot do with herdr's current plugin API:
-
-- The pane is a terminal overlay (a popup once herdr ships popup placement),
-  not tabs inside herdr's Settings, and it cannot read herdr's theme.
-- New workspace cannot switch the client to another machine; after creating
-  a remote workspace it points you to the sidebar.
-- Between reconciliations herdr may briefly show a machine that changed state
-  elsewhere (for example, auto-suspended) as reconnecting.
-- herdr's sidebar has no instabox actions; use the pane.
-- Key bindings for the plugin's actions work only while Local is the active
-  machine. herdr sends a custom key binding to the active machine's server,
-  and a remote machine's server has neither the binding nor the plugin.
-  Switch to Local in the sidebar first.
-
-
-
-## Configuration (fork)
-
-The fork reads `HERDR_PLUGIN_CONFIG_DIR/config.json` (normally
-`~/.config/herdr/plugins/config/v01dstar.instabox/config.json`) so a deployment
-can point the plugin at a prepared base snapshot and wider machine set without
-changing code. Every field is optional; without the file the plugin behaves like
-upstream (the `herdr` template, no Secrets or env).
-
-```json
-{
-  "templates": ["agent-browser", "herdr"],
-  "snapshotPrefixes": ["1984-"],
-  "metadata": { "purpose": "1984", "herdr": "true" },
-  "secrets": ["GH_TOKEN"],
-  "env": { "APP_ENV": "development" },
-  "envFile": "/home/me/instabox/box.env",
-  "defaultTemplate": "agent-browser",
-  "defaultSnapshot": "1984-ready",
-  "defaultCwd": "/data/workspace/bigbrother",
-  "workspaces": [
-    { "id": "bigbrother", "title": "BigBrother", "cwd": "/data/workspace/bigbrother" }
-  ]
-}
-```
-
-- `templates` / `metadata`: which machines are synced into Herdr. A machine
-  matching either is included.
-- `snapshotPrefixes`: snapshots that are offered as create sources in addition
-  to snapshots whose template is listed.
-- `secrets`, `env`, `envFile`: sent on every create (`envFile` is read at create
-  time; `env` wins on collisions).
-- `defaultTemplate`, `defaultSnapshot`: used when a create names neither.
-  `defaultSnapshot` wins when a snapshot exists.
-- `defaultCwd` / `workspaces`: `new-workspace` passes `--cwd`; a keybinding can
-  call `bin/herdr-instabox new-workspace /data/workspace/mcps` for another repo.
+- [Usage and machine lifecycle](docs/usage.md)
+- [Authentication and account isolation](docs/authentication.md)
+- [Configuration reference](docs/configuration.md)
+- [Troubleshooting and recovery](docs/troubleshooting.md)
+- [Architecture and design](docs/design.md)
+- [Verification and live smoke-test checklist](docs/verification.md)
+- [Contributing](CONTRIBUTING.md) · [Changelog](CHANGELOG.md) · [Documentation index for agents](llms.txt)
 
 ## Development
 
 ```bash
-go test ./...        # runs against a fake instabox API and the fake herdr CLI in testdata/fake
+go test ./...
+go test -race ./...
+go vet ./...
 go build -o bin/herdr-instabox .
+python3 scripts/check-docs.py
 ```
-# Local snapshot credential profiles
 
-This checkout adds `snapshotProfiles` to `config.json`, keyed by snapshot ID
-(used by the UI) or name. Each entry has `secrets` and `metadata`. A matching
-profile **replaces** the global Secret selection and merges metadata. This keeps
-personal and work OpenRouter credentials separate and lets generic images omit
-GitHub auth. `disableVault: true` prevents unrelated personal Vault delivery on
-new machines. Configure both name and ID entries when changing a snapshot.
+Tests use a fake InstaBox API and Herdr CLI—no cloud account needed. CI checks Linux/macOS, example configs, local documentation links, and builds. Live cloud behavior is a separate [verification step](docs/verification.md), not implied by a green unit-test badge.
 
-The active local configuration is at
-`~/.config/herdr/plugins/config/v01dstar.instabox/config.json`.
-There are no credentials in that file. Run `go test ./...` before rebuilding.
+### Acknowledgments
+
+Built on [v01dstar’s original plugin](https://github.com/v01dstar/herdr-instabox). Documentation and onboarding patterns were informed by the [Docker Sandboxes](https://github.com/dirien/herdr-sbx-plugin), [Blaxel](https://github.com/blaxel-ai/herdr-blaxel-sandbox-plugin), [Upstash Box](https://github.com/upstash/herdr-upstash-box), and [Vercel Sandbox](https://github.com/vercel-labs/herdr-vercel-sandbox-plugin) plugins. This integration is not an official Herdr product.

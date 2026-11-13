@@ -280,11 +280,14 @@ func waitOperation(op Operation) (Operation, error) {
 // fleet. By default that is the herdr template; config.json can widen it to
 // other templates or to machines carrying configured metadata labels.
 func listMachines() ([]Machine, error) {
+	cfg, err := readConfig(configPath())
+	if err != nil {
+		return nil, err
+	}
 	all, err := listAllMachines()
 	if err != nil {
 		return nil, err
 	}
-	cfg := loadConfig()
 	scope, err := currentIdentity()
 	if err != nil {
 		return nil, err
@@ -363,7 +366,10 @@ func getUsage() (Usage, error) {
 }
 
 func createMachine(name, template, snapshot string) (Operation, error) {
-	cfg := loadConfig()
+	cfg, err := readConfig(configPath())
+	if err != nil {
+		return Operation{}, err
+	}
 	if snapshot == "" {
 		snapshot = cfg.DefaultSnapshot
 	}
@@ -406,7 +412,7 @@ func createMachine(name, template, snapshot string) (Operation, error) {
 		in["metadata"] = metadata
 	}
 	var op Operation
-	err := call(request{method: http.MethodPost, path: "/v1/machines", in: in, out: &op, auth: true, mutate: true})
+	err = call(request{method: http.MethodPost, path: "/v1/machines", in: in, out: &op, auth: true, mutate: true})
 	return op, err
 }
 

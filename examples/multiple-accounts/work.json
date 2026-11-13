@@ -1,0 +1,7 @@
+{
+  "templates": ["herdr"],
+  "secrets": ["WORK_MODEL_KEY", "WORK_GH_TOKEN"],
+  "disableVault": true,
+  "metadata": { "credentialProfile": "work" },
+  "defaultCwd": "/data/workspace/work-app"
+}

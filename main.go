@@ -24,6 +24,10 @@ import (
 
 func main() {
 	args := os.Args[1:]
+	if len(args) > 0 && (args[0] == "--help" || args[0] == "-h" || args[0] == "help") {
+		fmt.Print(helpText)
+		return
+	}
 	explicitAccount := false
 	name := activeAccount()
 	if len(args) > 0 && args[0] == "--account" {
@@ -41,6 +45,17 @@ func main() {
 		fmt.Fprintln(os.Stderr, "herdr-instabox:", err)
 		os.Exit(1)
 	}
+	if len(args) > 0 && (args[0] == "--help" || args[0] == "-h" || args[0] == "help") {
+		fmt.Print(helpText)
+		return
+	}
+	// Keep diagnostics and sign-out available even when configuration is broken.
+	if len(args) == 0 || (args[0] != "doctor" && args[0] != "logout" && args[0] != "account" && args[0] != "install-keys" && args[0] != "ensure-cert" && args[0] != "sync" && args[0] != "job") {
+		if _, err := readConfig(configPath()); err != nil {
+			fmt.Fprintln(os.Stderr, "herdr-instabox:", err)
+			os.Exit(1)
+		}
+	}
 	os.Args = append([]string{os.Args[0]}, args...)
 	cmd := "ui"
 	if len(os.Args) > 1 {
@@ -54,6 +69,10 @@ func main() {
 	}
 	var err error
 	switch cmd {
+	case "doctor":
+		err = doctor(os.Stdout, os.Args[2:])
+	case "setup":
+		err = setup(os.Stdin, os.Stdout, arg(2))
 	case "ui":
 		if err = selectAccount(activeAccount()); err != nil {
 			break
@@ -146,7 +165,11 @@ func newWorkspace(cwd ...string) error {
 		dir = cwd[0]
 	}
 	if dir == "" {
-		dir = loadConfig().DefaultCwd
+		cfg, err := readConfig(configPath())
+		if err != nil {
+			return err
+		}
+		dir = cfg.DefaultCwd
 	}
 	args := []string{"workspace", "create"}
 	if dir != "" {

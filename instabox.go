@@ -107,6 +107,7 @@ type Usage struct {
 
 // Account is who the plugin is signed in as.
 type Account struct {
+	OrgID                 string
 	Login, UserID, Server string
 	// SignedOut is a definite "nobody is signed in"; Err is any other failure,
 	// such as an unreachable server, which must not be mistaken for it.
@@ -162,13 +163,16 @@ const HerdrTemplate = "herdr"
 // newest first. By default that is snapshots of herdr machines; config.json can
 // widen it by template or by snapshot name prefix.
 func listSnapshots() ([]Snapshot, error) {
+	cfg, err := readConfig(configPath())
+	if err != nil {
+		return nil, err
+	}
 	var out struct {
 		Snapshots []Snapshot `json:"snapshots"`
 	}
 	if err := call(request{method: http.MethodGet, path: "/v1/snapshots", out: &out, auth: true}); err != nil {
 		return nil, err
 	}
-	cfg := loadConfig()
 	scope, err := currentIdentity()
 	if err != nil {
 		return nil, err

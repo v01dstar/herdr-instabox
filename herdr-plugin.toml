@@ -38,6 +38,18 @@ title = "New workspace on the default machine"
 contexts = ["workspace"]
 command = ["bin/herdr-instabox", "new-workspace"]
 
+[[actions]]
+id = "setup"
+title = "Set up an InstaBox account"
+contexts = ["workspace"]
+command = ["bin/herdr-instabox", "open", "account"]
+
+[[actions]]
+id = "doctor"
+title = "InstaBox local diagnostics (read-only)"
+contexts = ["workspace"]
+command = ["bin/herdr-instabox", "doctor", "--json"]
+
 # Switch these to placement = "popup" once the installed herdr supports it.
 [[panes]]
 id = "ui"

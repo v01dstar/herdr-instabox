@@ -2,7 +2,7 @@
 
 [Home](../README.md) · [Security](../SECURITY.md)
 
-![Account and connection architecture](assets/architecture.svg)
+![Herdr connections to cloud machines and reusable snapshots](assets/architecture.svg)
 
 ## A remote manager, not an upload bridge
 

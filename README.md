@@ -1,4 +1,4 @@
-# InstaBox for Herdr
+# ![InstaBox for Herdr](docs/assets/herdr-instabox.svg)
 
 **Create cloud machines, open persistent workspaces, and reuse your best environments—without leaving Herdr.**
 
